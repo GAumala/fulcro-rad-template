@@ -13,6 +13,9 @@
                                                   :allow-ephemeral? true
                                                   :secure-cookies?  false}
 
+ ;; Where `backup/backup!` writes (absolute path, outside the database storage). Unset: backups are disabled.
+ :com.example.components.backup/dir nil
+
  :ring.middleware/defaults-config   {:params    {:keywordize true
                                                  :multipart  true
                                                  :nested     true

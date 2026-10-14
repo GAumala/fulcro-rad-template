@@ -136,6 +136,50 @@ An nREPL connection can run any code in the server and has no login of its own. 
 to another interface; anyone with a shell on the machine (or `docker exec`) can use it. Leave `NREPL_PORT` unset
 to turn it off.
 
+== Backups
+
+With Datomic Local, back up from a REPL inside the running server (<<Operating the live server>>); no downtime:
+
+[source,clojure]
+----
+(require '[com.example.components.backup :as backup])
+(backup/backup!)            ; => {:path "/backups/backup-20261014T174403Z", :t 1234, :bytes ..., :attempts 1}
+(backup/backups)            ; newest first
+(backup/prune-backups! 14)  ; delete all but the 14 newest (only ever touches backups it created)
+----
+
+Backups go to `BACKUP_DIR` (`/backups` in the Docker image): an absolute path, ideally on different storage than
+the database. What `backup!` guarantees:
+
+* *Consistent while running*: a database is an append-only log plus an index. The index is copied first (copying
+  the log first can produce a corrupt backup), into a temp directory renamed only once complete.
+* *Verified*: the copy is opened and its newest transaction compared with the live database, both its data and its
+  log entry. A copy taken while a transaction was being written can hold the data but an empty log entry, a gap
+  that would stay permanent after a restore; such copies are retaken (`:attempts`), up to 5 times.
+* *Private*: files are readable only by the server's user. Backups contain everything, password hashes included.
+
+It does not copy backups off the machine. Do that separately (and encrypt them there), e.g. sync `BACKUP_DIR` to
+object storage on a schedule.
+
+*Scheduling*: run it from cron through the jar's nREPL client, e.g. nightly:
+
+[source,bash]
+----
+echo "(require 'com.example.components.backup) (com.example.components.backup/backup!) (com.example.components.backup/prune-backups! 14)" |
+  java -cp app.jar clojure.main -m nrepl.cmdline --connect --host 127.0.0.1 --port 7888
+----
+
+*Restoring* (stop the server; copy, don't run the server on the backup directory itself: it would modify it):
+
+[source,bash]
+----
+mv "$DATOMIC_STORAGE_DIR" "$DATOMIC_STORAGE_DIR.before-restore"   # keep the current state, just in case
+cp -a /backups/backup-20261014T174403Z "$DATOMIC_STORAGE_DIR"
+# then start the server
+----
+
+With Datomic Pro or Cloud, use their own backup tools instead; `backup!` only handles Datomic Local.
+
 == Deployment
 
 The app is a single JVM process: http-kit serves the API and the compiled JS.
@@ -155,6 +199,7 @@ Runtime configuration (`config/prod.edn`, deep-merged over `config/defaults.edn`
 | `DATOMIC_STORAGE_DIR` | Absolute path for Datomic Local storage. *Must be persistent* (a volume); the Docker image uses `/data`.
 | `SESSION_KEY` | *Required.* 32 hex chars (`make session-key`) encrypting the session cookie. Nothing is stored server side, so sessions survive restarts and work across instances. Keep it stable and secret; changing it logs everybody out.
 | `NREPL_PORT` | Optional. Starts an nREPL server on 127.0.0.1 for <<Operating the live server>>.
+| `BACKUP_DIR` | Optional. Where `backup!` writes (see <<Backups>>); `/backups` in the Docker image.
 | `SECURE_COOKIES` | Unset = `true` (cookie sent over HTTPS only). Set `false` only to test over plain HTTP (`make run-jar` does).
 | `-Dconfig=/path.edn` | Replace `prod.edn` entirely, e.g. to point at Datomic Pro or Cloud instead of Datomic Local
 |===

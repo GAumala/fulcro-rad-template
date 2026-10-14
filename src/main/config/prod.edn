@@ -21,8 +21,12 @@
  ;; NREPL_PORT: when set, an nREPL server listens on 127.0.0.1 only (see components/nrepl.clj). Leave unset to disable.
  :com.example.components.nrepl/port :env.edn/NREPL_PORT
 
+ ;; BACKUP_DIR: where `backup/backup!` (run over nREPL) writes. Absolute path on persistent storage, ideally
+ ;; another disk than DATOMIC_STORAGE_DIR. Unset: backups are disabled.
+ :com.example.components.backup/dir :env/BACKUP_DIR
+
  ;; Every :env/... variable above must be set (startup fails otherwise), except these
- :com.example.components.config/optional-env #{"NREPL_PORT" "SECURE_COOKIES"}
+ :com.example.components.config/optional-env #{"NREPL_PORT" "SECURE_COOKIES" "BACKUP_DIR"}
 
  :com.fulcrologic.rad.pathom/config {:log-requests?  false
                                      :log-responses? false}

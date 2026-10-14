@@ -19,15 +19,18 @@ RUN corepack pnpm exec shadow-cljs release main && clojure -T:build uber
 
 # ---- runtime: just a JRE and the jar --------------------------------------------------------
 FROM eclipse-temurin:21-jre
-RUN useradd --system --uid 10001 app && mkdir /data && chown app /data
+RUN useradd --system --uid 10001 app && mkdir /data /backups && chown app /data /backups
 USER app
 WORKDIR /app
 COPY --from=build /app/target/app.jar app.jar
 ENV PORT=3000 \
-    DATOMIC_STORAGE_DIR=/data
+    DATOMIC_STORAGE_DIR=/data \
+    BACKUP_DIR=/backups
 # Also required at runtime: SESSION_KEY (`make session-key`). Optional: NREPL_PORT (localhost-only nREPL, used
 # with `docker exec` to add users etc.; see README). Don't publish that port.
 # Datomic Local writes here: mount a persistent volume or you lose data on redeploy
 VOLUME /data
+# Online backups from `backup/backup!` (see README). Mount it on different storage than /data.
+VOLUME /backups
 EXPOSE 3000
 ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "app.jar"]
