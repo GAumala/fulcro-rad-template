@@ -20,6 +20,9 @@
  ;; NREPL_PORT: when set, an nREPL server listens on 127.0.0.1 only (see components/nrepl.clj). Leave unset to disable.
  :com.example.components.nrepl/port :env.edn/NREPL_PORT
 
+ ;; Every :env/... variable above must be set (startup fails otherwise), except these
+ :com.example.components.config/optional-env #{"NREPL_PORT" "SECURE_COOKIES"}
+
  :com.fulcrologic.rad.pathom/config {:log-requests?  false
                                      :log-responses? false}
 

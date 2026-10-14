@@ -28,9 +28,11 @@ Not included (deliberately): roles/permissions, sign-up and password reset, file
 
 [source,bash]
 ----
-./rename-project.sh com.my-domain.app-name   # use hyphens, not underscores
+./rename-project.sh com.my-domain.app-name   # use hyphens, not underscores; macOS and Linux
 pnpm install                                 # npm/yarn are refused
 ----
+
+The script renames every mention (namespaces, config keys, paths, docs) and moves the source directories.
 
 A `mise.toml` pins Java 21, Clojure and Node 24 (`mise install`). pnpm is provided by corepack (`corepack enable`).
 
@@ -157,8 +159,11 @@ Runtime configuration (`config/prod.edn`, deep-merged over `config/defaults.edn`
 | `-Dconfig=/path.edn` | Replace `prod.edn` entirely, e.g. to point at Datomic Pro or Cloud instead of Datomic Local
 |===
 
-The schema is created/migrated automatically from your attributes at startup. If startup fails (e.g. no
-`SESSION_KEY`), the process exits with code 1.
+Every environment variable referenced in the config must be set, or the server refuses to start and lists all the
+missing ones (blank counts as missing). Variables that may be left unset are declared in `prod.edn` under
+`:com.example.components.config/optional-env`. Any startup failure exits with code 1.
+
+The schema is created/migrated automatically from your attributes at startup.
 
 Things to decide before going to production:
 
