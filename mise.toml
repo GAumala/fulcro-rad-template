@@ -2,3 +2,5 @@
 java = "temurin-21"
 clojure = "latest"
 node = "24"
+# Must match "packageManager" in package.json (devEngines refuses any other pnpm version)
+pnpm = "11.21.0"

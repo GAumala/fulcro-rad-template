@@ -34,7 +34,9 @@ pnpm install                                 # npm/yarn are refused
 
 The script renames every mention (namespaces, config keys, paths, docs) and moves the source directories.
 
-A `mise.toml` pins Java 21, Clojure and Node 24 (`mise install`). pnpm is provided by corepack (`corepack enable`).
+A `mise.toml` pins Java 21, Clojure, Node 24 and pnpm: `mise install` sets up everything. pnpm must be the version
+in `package.json`'s `packageManager` (`devEngines` refuses others), so update both together. Without mise,
+`corepack enable` also provides that pnpm version.
 
 == Development
 
