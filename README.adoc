@@ -169,14 +169,36 @@ echo "(require 'com.example.components.backup) (com.example.components.backup/ba
   java -cp app.jar clojure.main -m nrepl.cmdline --connect --host 127.0.0.1 --port 7888
 ----
 
-*Restoring* (stop the server; copy, don't run the server on the backup directory itself: it would modify it):
+*Restoring* is purely a file operation; the app isn't involved, but it *must be stopped* (Datomic Local reads and
+appends to these files directly). A backup has the same layout as the storage directory (`app/example/db.log`...),
+so restoring means putting its contents there:
 
 [source,bash]
 ----
+# with the server stopped
 mv "$DATOMIC_STORAGE_DIR" "$DATOMIC_STORAGE_DIR.before-restore"   # keep the current state, just in case
-cp -a /backups/backup-20261014T174403Z "$DATOMIC_STORAGE_DIR"
+mkdir "$DATOMIC_STORAGE_DIR"
+tar xzf backup-20261014T174403Z.tgz -C "$DATOMIC_STORAGE_DIR"      # an archived backup (tar czf X.tgz -C <backup-dir> .)
+# or, from a backup directory: cp -a /backups/backup-20261014T174403Z/. "$DATOMIC_STORAGE_DIR"/
 # then start the server
 ----
+
+Don't start the server with `DATOMIC_STORAGE_DIR` pointing at a backup directory itself: it would write into it.
+
+With Docker, stop the app container and do the same from a throwaway container. The files must belong to the app's
+user (uid 10001), whatever machine the archive came from:
+
+[source,bash]
+----
+docker stop app
+docker run --rm -v app-data:/data -v "$PWD":/restore alpine sh -c '
+  mkdir -p /data/.before-restore && find /data -mindepth 1 -maxdepth 1 ! -name .before-restore -exec mv {} /data/.before-restore/ \; &&
+  tar xzf /restore/backup-20261014T174403Z.tgz -C /data && chown -R 10001 /data'
+docker start app
+----
+
+Once the restored app looks right, delete `/data/.before-restore` (or `$DATOMIC_STORAGE_DIR.before-restore`); a
+later restore needs it gone.
 
 With Datomic Pro or Cloud, use their own backup tools instead; `backup!` only handles Datomic Local.
 
