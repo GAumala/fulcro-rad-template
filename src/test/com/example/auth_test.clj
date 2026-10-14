@@ -3,14 +3,16 @@
   (:require
     [clojure.test :refer [use-fixtures]]
     [com.example.components.auth :as auth]
-    [com.example.components.auth-cli :as auth-cli]
+    [com.example.components.nrepl :as app-nrepl]
     [com.example.components.parser :as parser]
     [com.example.session :as session]
     [com.example.test-support :as ts]
     [com.fulcrologic.fulcro.application :as app]
     [com.fulcrologic.fulcro.data-fetch :as df]
     [com.fulcrologic.fulcro.headless :as h]
-    [fulcro-spec.core :refer [specification behavior component assertions =>]]))
+    [fulcro-spec.core :refer [specification behavior component assertions =>]]
+    [nrepl.core :as nrepl]
+    [nrepl.server :as nrepl-server]))
 
 (use-fixtures :once ts/with-backend)
 
@@ -91,9 +93,18 @@
     (assertions
       "enabling allows it again"
       (some? (auth/authenticate "new-user@example.com" "changed")) => true))
-  (component "the CLI"
-    ;; Calls the command handler directly: -main would restart mount against prod config and exit the JVM
-    (with-in-str "piped-password\n" (#'auth-cli/run "add-user" "cli-user@example.com"))
-    (assertions
-      "adds a user, reading the password from stdin when there is no terminal"
-      (:user/email (auth/authenticate "cli-user@example.com" "piped-password")) => "cli-user@example.com")))
+  (component "through the server's nREPL"
+    (let [server (app-nrepl/start! 0)]
+      (try
+        (with-open [conn (nrepl/connect :host "127.0.0.1" :port (:port server))]
+          (-> (nrepl/client conn 10000)
+            (nrepl/message {:op   "eval"
+                            :code "(com.example.components.auth/add-user! \"repl-user@example.com\" \"via-repl\")"})
+            doall))
+        (assertions
+          "only listens on localhost"
+          (.getHostAddress (.getInetAddress ^java.net.ServerSocket (:server-socket server))) => "127.0.0.1"
+          "adds a user inside the running server, who can then log in"
+          (:user/email (auth/authenticate "repl-user@example.com" "via-repl")) => "repl-user@example.com")
+        (finally
+          (nrepl-server/stop-server server))))))

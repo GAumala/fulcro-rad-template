@@ -25,7 +25,8 @@ WORKDIR /app
 COPY --from=build /app/target/app.jar app.jar
 ENV PORT=3000 \
     DATOMIC_STORAGE_DIR=/data
-# Also required at runtime: SESSION_KEY (`make session-key`). Add users with the auth CLI (see README).
+# Also required at runtime: SESSION_KEY (`make session-key`). Optional: NREPL_PORT (localhost-only nREPL, used
+# with `docker exec` to add users etc.; see README). Don't publish that port.
 # Datomic Local writes here: mount a persistent volume or you lose data on redeploy
 VOLUME /data
 EXPOSE 3000

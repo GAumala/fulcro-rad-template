@@ -1,5 +1,4 @@
-.PHONY: cljs release test uberjar docker run-jar session-key report
-.PHONY: add-user # AUTH: remove
+.PHONY: cljs release test uberjar docker run-jar repl-jar session-key report
 
 # Dev: shadow-cljs server (watch builds from its UI at http://localhost:9630, nREPL on 9000)
 cljs:
@@ -20,12 +19,11 @@ uberjar: release
 # Run the uberjar like production would, with Datomic persisted under ./data.
 # Needs SESSION_KEY (see `make session-key`). Plain HTTP locally, so cookies can't be Secure-only.
 run-jar:
-	PORT=3000 DATOMIC_STORAGE_DIR=$(CURDIR)/data SECURE_COOKIES=false java -jar target/app.jar
+	PORT=3000 NREPL_PORT=7888 DATOMIC_STORAGE_DIR=$(CURDIR)/data SECURE_COOKIES=false java -jar target/app.jar
 
-# AUTH: remove the next 4 lines
-# Add a login to the ./data database used by run-jar (stop run-jar first), e.g. `make add-user EMAIL=me@example.com`
-add-user:
-	DATOMIC_STORAGE_DIR=$(CURDIR)/data java -cp target/app.jar clojure.main -m com.example.components.auth-cli add-user $(EMAIL)
+# REPL into the server started by run-jar (e.g. to add users), using the nREPL client inside the jar
+repl-jar:
+	java -cp target/app.jar clojure.main -m nrepl.cmdline --connect --host 127.0.0.1 --port 7888
 
 # A new random SESSION_KEY (keep it stable: changing it logs everybody out)
 session-key:

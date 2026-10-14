@@ -17,7 +17,7 @@ toc::[]
 | Rendering | `com.example.ui.render.*`: plain HTML renderers, *owned by this app* (no UI plugin library). Restyle them with your design system.
 | Server | http-kit + Ring, Pathom 2 with RAD's generated resolvers, `mount` for lifecycle
 | Database | Datomic via the client API (`fulcro-rad-datomic`). In-memory in dev, on-disk Datomic Local in prod.
-| Auth | Users with email/password login (bcrypt hashes in Datomic), every API call guarded, REPL/CLI user management. Easy to remove. See <<Authentication>>.
+| Auth | Users with email/password login (bcrypt hashes in Datomic), every API call guarded, users managed from the live server's REPL. Easy to remove. See <<Authentication>>.
 | Tests | Headless end-to-end tests: real client + real Ring handler + parser + in-memory Datomic in one JVM. No browser.
 | Deploy | `build.clj` uberjar, `Dockerfile`, `config/prod.edn` driven by env vars
 |===
@@ -89,7 +89,7 @@ user=> (development/restart)  ; stop, reload source, start
 
 === Managing users
 
-From a REPL (dev or a REPL attached to production):
+Users are managed from a REPL, inside the running server, so nothing needs restarting:
 
 [source,clojure]
 ----
@@ -100,30 +100,39 @@ From a REPL (dev or a REPL attached to production):
 (auth/users)
 ----
 
-Without a REPL (e.g. on a server or in a container), with the uberjar. It uses `config/prod.edn` like the server,
-and prompts for the password (or reads it from stdin when piped), so it stays out of shell history:
-
-[source,bash]
-----
-java -cp app.jar clojure.main -m com.example.components.auth-cli add-user me@example.com
-java -cp app.jar clojure.main -m com.example.components.auth-cli set-password me@example.com
-java -cp app.jar clojure.main -m com.example.components.auth-cli disable me@example.com   # or enable
-java -cp app.jar clojure.main -m com.example.components.auth-cli list
-----
-
-With Datomic Local, stop the server first: its storage is meant to be used by one process at a time.
-`make add-user EMAIL=me@example.com` does this for the `./data` database used by `make run-jar`.
+In development that's your usual REPL. In production, see <<Operating the live server>>.
 
 === Removing authentication
 
-Authentication is self-contained, for apps that don't need users. Sessions (and CSRF protection) stay; they're
-general infrastructure.
+Authentication is self-contained, for apps that don't need users. Sessions (and CSRF protection) and the live
+nREPL stay; they're general infrastructure.
 
-1. Delete `src/main/com/example/components/auth.clj`, `auth_cli.clj`, `src/main/com/example/session.cljc`,
+1. Delete `src/main/com/example/components/auth.clj`, `src/main/com/example/session.cljc`,
    `src/main/com/example/ui/login.cljc` and `src/test/com/example/auth_test.clj`.
 2. `grep -rn "AUTH:" src deps.edn Makefile` and apply each marker: `AUTH: remove` at the end of a line removes
    that line; `AUTH: remove the next N lines` and `AUTH: replace the next N lines with ...` say what they do.
 3. Remove this section and the `Auth` row from the README.
+
+== Operating the live server
+
+Set `NREPL_PORT` and the server also starts an nREPL server, *bound to 127.0.0.1 only*. Use it to add users,
+inspect data or fix things without a restart. The uberjar contains a client:
+
+[source,bash]
+----
+# on the server (or `make repl-jar` against `make run-jar` locally)
+java -cp app.jar clojure.main -m nrepl.cmdline --connect --host 127.0.0.1 --port 7888
+
+# Docker: the port is inside the container, so connect from inside it
+docker exec -it <container> java -cp app.jar clojure.main -m nrepl.cmdline --connect --host 127.0.0.1 --port 7888
+
+# From your machine with an editor (CIDER, Calva, Cursive...): tunnel it, then connect to localhost:7888
+ssh -N -L 7888:127.0.0.1:7888 you@server
+----
+
+An nREPL connection can run any code in the server and has no login of its own. Never publish the port or bind it
+to another interface; anyone with a shell on the machine (or `docker exec`) can use it. Leave `NREPL_PORT` unset
+to turn it off.
 
 == Deployment
 
@@ -143,6 +152,7 @@ Runtime configuration (`config/prod.edn`, deep-merged over `config/defaults.edn`
 | `PORT` | HTTP port
 | `DATOMIC_STORAGE_DIR` | Absolute path for Datomic Local storage. *Must be persistent* (a volume); the Docker image uses `/data`.
 | `SESSION_KEY` | *Required.* 32 hex chars (`make session-key`) encrypting the session cookie. Nothing is stored server side, so sessions survive restarts and work across instances. Keep it stable and secret; changing it logs everybody out.
+| `NREPL_PORT` | Optional. Starts an nREPL server on 127.0.0.1 for <<Operating the live server>>.
 | `SECURE_COOKIES` | Unset = `true` (cookie sent over HTTPS only). Set `false` only to test over plain HTTP (`make run-jar` does).
 | `-Dconfig=/path.edn` | Replace `prod.edn` entirely, e.g. to point at Datomic Pro or Cloud instead of Datomic Local
 |===
@@ -156,7 +166,7 @@ Things to decide before going to production:
 * *Datomic topology*: Datomic Local is a single process writing to local disk, so run exactly one instance.
   Scaling out means Datomic Pro (transactor + storage) or Datomic Cloud.
 * *Auth*: review <<Authentication>> for what's not covered (rate limiting, sign-up/reset, roles). Create the first
-  user with the CLI before going live.
+  user over nREPL (see <<Operating the live server>>) before going live.
 
 == LICENSE
 

@@ -4,7 +4,8 @@
    * Users: a `user` entity (`:user/id`, `:user/email`, `:user/password-hash`, `:user/active?`), separate from the
      app's own entities. It is plain Datomic schema, deliberately NOT RAD attributes: RAD generates resolvers for
      every attribute it knows about, which would let any client query the hashes. Only this namespace reads them.
-     Manage users with `add-user!` / `set-password!` / `set-active!` from a REPL, or the `auth-cli` namespace.
+     Manage users with `add-user!` / `set-password!` / `set-active!` from a REPL (in production, the server's
+     nREPL; see `com.example.components.nrepl`).
    * Sessions: the logged-in user id lives in the Ring session (see `com.example.lib.session`).
    * Authorization: `guard-plugin` rejects every resolver and mutation except the public ones below unless the
      request has a logged-in user. Finer-grained rules (roles, ownership) go there too.
@@ -45,7 +46,7 @@
             db email)))
 
 ;; ---------------------------------------------------------------------------------------------------------------
-;; User management (REPL / auth-cli)
+;; User management (REPL)
 
 (defn add-user!
   "Creates an active user. Throws if the email is already taken. Returns the new user's id."

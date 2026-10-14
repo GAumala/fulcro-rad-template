@@ -5,6 +5,7 @@
     [mount.core :as mount :refer [defstate]]
     [taoensso.timbre :as log]
     [com.example.components.config :refer [config]]
+    [com.example.components.nrepl]                          ; optional live REPL (NREPL_PORT)
     [com.example.components.ring-middleware :refer [middleware]]))
 
 (defstate http-server
