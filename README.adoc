@@ -165,6 +165,55 @@ missing ones (blank counts as missing). Variables that may be left unset are dec
 
 The schema is created/migrated automatically from your attributes at startup.
 
+=== Adding configuration
+
+To add settings for a new service (S3, Redis, an API key...):
+
+1. *Development values go in `config/defaults.edn`* (or `dev.edn`). Use local, non-secret values so the app and the
+   tests run without any environment setup. Tests load `dev.edn` too.
+2. *Production values go in `config/prod.edn`*, referencing environment variables for anything secret or
+   environment-specific: `:env/NAME` gives the string, `:env.edn/NAME` parses it as EDN (numbers, booleans).
+   `prod.edn` is deep-merged over `defaults.edn`, so only list what differs; set a key to `nil` to drop a dev-only
+   value.
+3. *Validation is automatic*: every variable referenced this way is required, and startup fails naming any that
+   are unset. If the service is optional, add its variables to `:com.example.components.config/optional-env`
+   (in `prod.edn`) and handle the `nil` in code.
+4. *Read it in the component* that uses it, with the key namespaced after that component (the rename script
+   renames these keys along with the code).
+
+Example, an S3 client:
+
+[source,clojure]
+----
+;; config/defaults.edn: a local MinIO for development
+:com.example.components.s3/config {:bucket     "dev-bucket"
+                                   :region     "us-east-1"
+                                   :endpoint   "http://localhost:9000"
+                                   :access-key "minio"
+                                   :secret-key "minio123"}
+
+;; config/prod.edn: real credentials from the environment; no custom endpoint in prod
+:com.example.components.s3/config {:bucket     :env/S3_BUCKET
+                                   :region     :env/AWS_REGION
+                                   :endpoint   nil
+                                   :access-key :env/AWS_ACCESS_KEY_ID
+                                   :secret-key :env/AWS_SECRET_ACCESS_KEY}
+
+;; src/main/com/example/components/s3.clj
+(ns com.example.components.s3
+  (:require
+    [com.example.components.config :refer [config]]
+    [mount.core :refer [defstate]]))
+
+(defstate s3-client
+  :start (let [{:keys [bucket region endpoint access-key secret-key]} (::config config)]
+           (make-client ...)))   ; with your S3 library of choice
+----
+
+Starting production without, say, `AWS_REGION` then fails with
+`Missing required environment variables: AWS_REGION ...`. Never put a real secret as a literal in these files:
+they are committed and packaged into the jar.
+
 Things to decide before going to production:
 
 * *TLS*: terminate at a proxy/load balancer (HSTS is on, `:ssl-redirect` is off).

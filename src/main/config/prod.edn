@@ -1,5 +1,6 @@
 ;; Deep-merged over defaults.edn. `:env/VAR` reads an environment variable as a string,
 ;; `:env.edn/VAR` reads it as EDN (numbers, maps, ...). Override the whole file with -Dconfig=/path.edn
+;; Adding settings for a new service: see "Adding configuration" in the README.
 {:org.httpkit.server/config         {:port :env.edn/PORT}
 
  ;; Datomic Local persisted to disk. DATOMIC_STORAGE_DIR must be an absolute path on a
