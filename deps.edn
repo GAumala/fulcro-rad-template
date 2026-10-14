@@ -23,7 +23,7 @@
            ring/ring-defaults                      {:mvn/version "0.7.0"}
            ring/ring-core                          {:mvn/version "1.15.3"}
            http-kit/http-kit                       {:mvn/version "2.8.1"}
-           buddy/buddy-hashers                     {:mvn/version "2.0.167"}
+           buddy/buddy-hashers                     {:mvn/version "2.0.167"} ; AUTH: password hashing
            com.datomic/local                       {:mvn/version "1.0.291"}
            com.datomic/client-cloud                {:mvn/version "1.0.131"}
            com.fulcrologic/fulcro-rad-datomic      {:mvn/version "1.5.6"}

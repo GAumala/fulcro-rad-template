@@ -5,7 +5,8 @@
     #?@(:cljs [[com.fulcrologic.fulcro.algorithms.timbre-support :refer [console-appender prefix-output-fn]]
                [fulcro.inspect.tool :as inspect]])
     [com.example.application :refer [SPA]]
-    [com.example.session :as session]
+    [com.example.session :as session]                       ; AUTH: remove
+    [com.example.ui.routes :as routes]
     [com.example.ui.render.plugin]                          ; registers the RAD renderers
     [com.example.ui.root :refer [Root]]
     [com.fulcrologic.fulcro.application :as app]
@@ -16,13 +17,14 @@
     [taoensso.timbre :as log]))
 
 (defn start!
-  "Installs statecharts and checks the session. Routing starts once someone is logged in
+  "Installs statecharts and checks the session; routing starts once someone is logged in
    (see `com.example.session`). `:event-loop?` is `true` in the browser and `:immediate` in CLJ tests."
   ([app] (start! app {}))
   ([app {:keys [event-loop?] :or {event-loop? true}}]
    ;; default time zone (can be changed at login for given user)
    (datetime/set-timezone! "America/Los_Angeles")
    (rad-app/install-statecharts! app {:event-loop? event-loop?})
+   ;; AUTH: without authentication, replace this line with (routes/start-routing! app)
    (session/check-session! app)
    app))
 

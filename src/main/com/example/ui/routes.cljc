@@ -5,7 +5,9 @@
     #?(:clj  [com.fulcrologic.fulcro.dom-server :as dom]
        :cljs [com.fulcrologic.fulcro.dom :as dom])
     [com.example.ui.account-forms :refer [AccountForm AccountList]]
+    [com.fulcrologic.fulcro.application :as app]
     [com.fulcrologic.fulcro.components :as comp :refer [defsc]]
+    [com.fulcrologic.rad.statechart.application :as rad-app]
     [com.fulcrologic.rad.statechart.form :as form]
     [com.fulcrologic.rad.statechart.report :as report]
     [com.fulcrologic.statecharts.chart :refer [statechart]]
@@ -37,11 +39,21 @@
    (e.g. /AccountList), so set it for nice URLs. Route params (form `:id`, report controls)
    go in the query string.
 
-   The chart is only started once someone is logged in (see `com.example.session`), so every
-   route here is behind the login."
+   With authentication, the chart is only started once someone is logged in (see `com.example.session`),
+   so every route here is behind the login."
   (statechart {:initial :state/route-root}
     (scr/routing-regions
       (scr/routes {:id :state/root :routing/root `Routes}
         (scr/rstate {:route/target `LandingPage :route/segment "home"})
         (report/report-route-state {:route/target AccountList :route/segment "accounts"})
         (form/form-route-state {:route/target AccountForm :route/segment "account"})))))
+
+(defn start-routing!
+  "Starts the routing chart (once). In the browser, URL sync then routes to the URL the user arrived on."
+  [app]
+  (let [runtime (::app/runtime-atom app)]
+    (when-not (::routing-started? @runtime)
+      (swap! runtime assoc ::routing-started? true)
+      (rad-app/start-routing! app routing-chart)
+      ;; Keeps the browser URL and the routing chart in sync (and restores the route on page load)
+      #?(:cljs (rad-app/install-url-sync! app)))))

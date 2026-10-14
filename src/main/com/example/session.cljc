@@ -4,22 +4,13 @@
    Routing only starts once someone is logged in. In the browser, URL sync then routes to whatever
    URL the user arrived on, so deep links work through the login page."
   (:require
-    [com.example.ui.routes :refer [routing-chart]]
+    [com.example.ui.routes :as routes]
     [com.fulcrologic.fulcro.application :as app]
-    [com.fulcrologic.fulcro.data-fetch :as df]
-    [com.fulcrologic.rad.statechart.application :as rad-app]))
-
-(defn- start-routing! [app]
-  (let [runtime (::app/runtime-atom app)]
-    (when-not (::routing-started? @runtime)
-      (swap! runtime assoc ::routing-started? true)
-      (rad-app/start-routing! app routing-chart)
-      ;; Keeps the browser URL and the routing chart in sync (and restores the route on page load)
-      #?(:cljs (rad-app/install-url-sync! app)))))
+    [com.fulcrologic.fulcro.data-fetch :as df]))
 
 (defn logged-in! [app user]
   (swap! (::app/state-atom app) assoc :session/current-user user :ui/auth-status :logged-in)
-  (start-routing! app))
+  (routes/start-routing! app))
 
 (defn logged-out! [app]
   (swap! (::app/state-atom app) assoc :session/current-user nil :ui/auth-status :logged-out))

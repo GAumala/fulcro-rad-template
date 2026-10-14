@@ -4,7 +4,7 @@
     #?(:clj  [com.fulcrologic.fulcro.dom-server :as dom]
        :cljs [com.fulcrologic.fulcro.dom :as dom])
     [com.example.ui.account-forms :refer [AccountForm AccountList]]
-    [com.example.ui.login :as login :refer [LoginPage ui-login-page]]
+    [com.example.ui.login :as login :refer [LoginPage ui-login-page]] ; AUTH: remove
     [com.example.ui.routes :refer [LandingPage Routes ui-routes]]
     [com.fulcrologic.fulcro.application :as app]
     [com.fulcrologic.fulcro.components :as comp :refer [defsc]]
@@ -16,39 +16,44 @@
 (defn nav-button [label on-click]
   (dom/button {:data-rad-type "nav-button" :onClick on-click} label))
 
-(defsc Root [this {::app/keys     [active-remotes]
-                   :ui/keys       [auth-status login routes]
-                   :session/keys  [current-user]}]
-  {:query         [:ui/auth-status
-                   :session/current-user
-                   {:ui/login (comp/get-query LoginPage)}
+(defn render-app
+  "The app itself: navigation, the unsaved-changes prompt, and the current route."
+  [this {::app/keys    [active-remotes]
+         :ui/keys      [routes]
+         :session/keys [current-user]}]
+  (let [busy?         (seq active-remotes)
+        ;; The routing chart enters :routing-info/open when an active route (e.g. a dirty form) vetoes navigation
+        route-denied? (contains? (scf/current-configuration this scr/session-id) :routing-info/open)]
+    (dom/div
+      (dom/nav {:data-rad-type "nav-bar"}
+        (nav-button "Home" (fn [] (scr/route-to! this LandingPage)))
+        (nav-button "Accounts" (fn [] (scr/route-to! this AccountList)))
+        (nav-button "New Account" (fn [] (form/create! this AccountForm)))
+        (dom/span {:data-rad-type "current-user"} (:user/email current-user)) ; AUTH: remove
+        (nav-button "Log out" (fn [] (comp/transact! this [(login/logout {})]))) ; AUTH: remove
+        (when busy? (dom/span {:data-rad-type "busy-indicator"} "Loading...")))
+      (when route-denied?
+        (dom/div {:data-rad-type "route-denied-modal"}
+          (dom/p "You have unsaved changes.")
+          (dom/button {:onClick (fn [] (scr/abandon-route-change! this))} "Stay")
+          (dom/button {:onClick (fn [] (scr/force-continue-routing! this))} "Discard changes")))
+      (dom/main
+        (ui-routes routes)))))
+
+(defsc Root [this {:ui/keys [auth-status login] :as props}]
+  {:query         [:ui/auth-status                          ; AUTH: remove
+                   :session/current-user                    ; AUTH: remove
+                   {:ui/login (comp/get-query LoginPage)}   ; AUTH: remove
                    {:ui/routes (comp/get-query Routes)}
                    ;; Makes Root re-render when the routing chart changes state
                    [::sc/session-id '_]
                    ::app/active-remotes]
-   :initial-state {:ui/auth-status :checking
-                   :ui/login       {}
+   :initial-state {:ui/auth-status :checking                ; AUTH: remove
+                   :ui/login       {}                       ; AUTH: remove
                    :ui/routes      {}}}
+  ;; AUTH: without authentication, replace this `case` with (render-app this props)
   (case auth-status
     :logged-out (ui-login-page login)
-    :logged-in
-    (let [busy?         (seq active-remotes)
-          ;; The routing chart enters :routing-info/open when an active route (e.g. a dirty form) vetoes navigation
-          route-denied? (contains? (scf/current-configuration this scr/session-id) :routing-info/open)]
-      (dom/div
-        (dom/nav {:data-rad-type "nav-bar"}
-          (nav-button "Home" (fn [] (scr/route-to! this LandingPage)))
-          (nav-button "Accounts" (fn [] (scr/route-to! this AccountList)))
-          (nav-button "New Account" (fn [] (form/create! this AccountForm)))
-          (dom/span {:data-rad-type "current-user"} (:account/email current-user))
-          (nav-button "Log out" (fn [] (comp/transact! this [(login/logout {})])))
-          (when busy? (dom/span {:data-rad-type "busy-indicator"} "Loading...")))
-        (when route-denied?
-          (dom/div {:data-rad-type "route-denied-modal"}
-            (dom/p "You have unsaved changes.")
-            (dom/button {:onClick (fn [] (scr/abandon-route-change! this))} "Stay")
-            (dom/button {:onClick (fn [] (scr/force-continue-routing! this))} "Discard changes")))
-        (dom/main
-          (ui-routes routes))))
-    ;; :checking — waiting for the server to say whether the session cookie is logged in
+    :logged-in (render-app this props)
+    ;; :checking: waiting for the server to say whether the session cookie is logged in
     (dom/div "Loading...")))

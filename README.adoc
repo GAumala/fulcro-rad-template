@@ -17,7 +17,7 @@ toc::[]
 | Rendering | `com.example.ui.render.*`: plain HTML renderers, *owned by this app* (no UI plugin library). Restyle them with your design system.
 | Server | http-kit + Ring, Pathom 2 with RAD's generated resolvers, `mount` for lifecycle
 | Database | Datomic via the client API (`fulcro-rad-datomic`). In-memory in dev, on-disk Datomic Local in prod.
-| Auth | Email/password login (bcrypt hashes in Datomic), encrypted cookie sessions, every API call guarded. See <<Authentication>>.
+| Auth | Users with email/password login (bcrypt hashes in Datomic), every API call guarded, REPL/CLI user management. Easy to remove. See <<Authentication>>.
 | Tests | Headless end-to-end tests: real client + real Ring handler + parser + in-memory Datomic in one JVM. No browser.
 | Deploy | `build.clj` uberjar, `Dockerfile`, `config/prod.edn` driven by env vars
 |===
@@ -46,7 +46,7 @@ make cljs             # shadow-cljs server; start the `main` watch at http://loc
 $ clj -A:dev
 user=> (require 'development)
 user=> (development/start)    ; server on http://localhost:3000, seeded in-memory Datomic
-                              ; log in as tony@example.com / letmein
+                              ; log in as dev@example.com / letmein
 user=> (development/restart)  ; stop, reload source, start
 ----
 
@@ -74,21 +74,56 @@ user=> (development/restart)  ; stop, reload source, start
 
 == Authentication
 
-* *Credentials*: `:account/password-hash` holds a bcrypt hash (`buddy-hashers`). It is plain Datomic schema in
-  `components/auth.clj`, deliberately *not* a RAD attribute: RAD generates resolvers for its attributes, which would
-  let any client query the hash. It is `:db/noHistory`, so replaced hashes aren't kept.
-* *Sessions*: the logged-in account id is stored in an encrypted session cookie (Ring's cookie store, key from
-  `SESSION_KEY`). Nothing is stored server side, so sessions survive restarts and work across instances.
-  Login rotates the session to prevent session fixation.
+* *Users*: a `user` entity (`:user/id`, `:user/email`, `:user/password-hash`, `:user/active?`), separate from your
+  own entities. It is plain Datomic schema in `components/auth.clj`, deliberately *not* RAD attributes: RAD generates
+  resolvers for its attributes, which would let any client query the hashes. Passwords are bcrypt hashes
+  (`buddy-hashers`).
+* *Sessions*: the logged-in user id is stored in the encrypted session cookie (see Deployment, `SESSION_KEY`).
+  Login rotates the session id to prevent session fixation.
 * *Guard*: `auth/guard-plugin` (a Pathom plugin) refuses every resolver and mutation to anonymous requests except
   `login`, `logout` and `:session/current-user`. Add role or ownership checks there.
 * *Client*: `com.example.session` asks the server who is logged in at startup. Routing only starts once someone is
   logged in; in the browser, URL sync then restores the URL the user arrived on. Logout reloads the page.
-* *Users*: accounts log in with their email. Set passwords with `(com.example.components.auth/set-password! email pw)`
-  from a REPL. In production, `ADMIN_EMAIL`/`ADMIN_PASSWORD` create the first login at startup (an existing password
-  is never overwritten). There is no UI yet to set passwords, sign up, or reset a forgotten password.
-* *Not covered*: login rate limiting / lockout, and revoking sessions. A deactivated account can't log in, but a
-  session it already has stays valid until logout or `SESSION_KEY` rotation.
+* *Not covered*: login rate limiting / lockout, sign-up, password reset, roles, and revoking sessions (a disabled
+  user can't log in again, but a session they already have stays valid until logout or `SESSION_KEY` rotation).
+
+=== Managing users
+
+From a REPL (dev or a REPL attached to production):
+
+[source,clojure]
+----
+(require '[com.example.components.auth :as auth])
+(auth/add-user! "me@example.com" "a long password")
+(auth/set-password! "me@example.com" "another one")
+(auth/set-active! "me@example.com" false)   ; disable / re-enable login
+(auth/users)
+----
+
+Without a REPL (e.g. on a server or in a container), with the uberjar. It uses `config/prod.edn` like the server,
+and prompts for the password (or reads it from stdin when piped), so it stays out of shell history:
+
+[source,bash]
+----
+java -cp app.jar clojure.main -m com.example.components.auth-cli add-user me@example.com
+java -cp app.jar clojure.main -m com.example.components.auth-cli set-password me@example.com
+java -cp app.jar clojure.main -m com.example.components.auth-cli disable me@example.com   # or enable
+java -cp app.jar clojure.main -m com.example.components.auth-cli list
+----
+
+With Datomic Local, stop the server first: its storage is meant to be used by one process at a time.
+`make add-user EMAIL=me@example.com` does this for the `./data` database used by `make run-jar`.
+
+=== Removing authentication
+
+Authentication is self-contained, for apps that don't need users. Sessions (and CSRF protection) stay; they're
+general infrastructure.
+
+1. Delete `src/main/com/example/components/auth.clj`, `auth_cli.clj`, `src/main/com/example/session.cljc`,
+   `src/main/com/example/ui/login.cljc` and `src/test/com/example/auth_test.clj`.
+2. `grep -rn "AUTH:" src deps.edn Makefile` and do what each comment says (remove the line, or the replacement it
+   describes).
+3. Remove `buddy-hashers` from `deps.edn` (tagged), and this section and the `Auth` row from the README.
 
 == Deployment
 
@@ -107,8 +142,7 @@ Runtime configuration (`config/prod.edn`, deep-merged over `config/defaults.edn`
 |===
 | `PORT` | HTTP port
 | `DATOMIC_STORAGE_DIR` | Absolute path for Datomic Local storage. *Must be persistent* (a volume); the Docker image uses `/data`.
-| `SESSION_KEY` | *Required.* 32 hex chars (`make session-key`) encrypting the session cookie. Keep it stable and secret; changing it logs everybody out.
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Create the first login at startup if that account has no password yet.
+| `SESSION_KEY` | *Required.* 32 hex chars (`make session-key`) encrypting the session cookie. Nothing is stored server side, so sessions survive restarts and work across instances. Keep it stable and secret; changing it logs everybody out.
 | `SECURE_COOKIES` | Unset = `true` (cookie sent over HTTPS only). Set `false` only to test over plain HTTP (`make run-jar` does).
 | `-Dconfig=/path.edn` | Replace `prod.edn` entirely, e.g. to point at Datomic Pro or Cloud instead of Datomic Local
 |===
@@ -121,7 +155,8 @@ Things to decide before going to production:
 * *TLS*: terminate at a proxy/load balancer (HSTS is on, `:ssl-redirect` is off).
 * *Datomic topology*: Datomic Local is a single process writing to local disk, so run exactly one instance.
   Scaling out means Datomic Pro (transactor + storage) or Datomic Cloud.
-* *Auth*: review <<Authentication>> for what's not covered (rate limiting, password management UI, roles).
+* *Auth*: review <<Authentication>> for what's not covered (rate limiting, sign-up/reset, roles). Create the first
+  user with the CLI before going live.
 
 == LICENSE
 

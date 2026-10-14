@@ -1,7 +1,7 @@
 (ns development
   (:require
     [clojure.tools.namespace.repl :as tools-ns :refer [set-refresh-dirs]]
-    [com.example.components.auth :as auth]
+    [com.example.components.auth :as auth]                  ; AUTH: remove
     [com.example.components.database :refer [datomic-connections]]
     [com.example.components.ring-middleware]
     [com.example.components.server]
@@ -29,8 +29,10 @@
       {:tx-data [(account/new-account "tony@example.com" :account/id (new-uuid 100))
                  (account/new-account "sam@example.com" :account/id (new-uuid 101))
                  (account/new-account "sally@example.com" :account/id (new-uuid 102) :account/active? false)]})
-    (auth/set-password! "tony@example.com" "letmein")
-    (log/info "Dev login: tony@example.com / letmein")))
+    ;; AUTH: remove the dev login
+    (when-not (some #(= "dev@example.com" (:user/email %)) (auth/users))
+      (auth/add-user! "dev@example.com" "letmein"))
+    (log/info "Dev login: dev@example.com / letmein")))
 
 (defn start []
   (mount/start-with-args {:config "config/dev.edn"})

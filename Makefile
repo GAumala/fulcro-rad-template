@@ -1,4 +1,4 @@
-.PHONY: cljs release test uberjar docker run-jar session-key report
+.PHONY: cljs release test uberjar docker run-jar add-user session-key report
 
 # Dev: shadow-cljs server (watch builds from its UI at http://localhost:9630, nREPL on 9000)
 cljs:
@@ -18,10 +18,13 @@ uberjar: release
 
 # Run the uberjar like production would, with Datomic persisted under ./data.
 # Needs SESSION_KEY (see `make session-key`). Plain HTTP locally, so cookies can't be Secure-only.
-# The first run creates the login from ADMIN_EMAIL/ADMIN_PASSWORD, e.g.:
-#   SESSION_KEY=... ADMIN_EMAIL=me@example.com ADMIN_PASSWORD=... make run-jar
 run-jar:
 	PORT=3000 DATOMIC_STORAGE_DIR=$(CURDIR)/data SECURE_COOKIES=false java -jar target/app.jar
+
+# AUTH: remove this target (and `add-user` in .PHONY).
+# Add a login to the ./data database used by run-jar (stop run-jar first), e.g. `make add-user EMAIL=me@example.com`
+add-user:
+	DATOMIC_STORAGE_DIR=$(CURDIR)/data java -cp target/app.jar clojure.main -m com.example.components.auth-cli add-user $(EMAIL)
 
 # A new random SESSION_KEY (keep it stable: changing it logs everybody out)
 session-key:

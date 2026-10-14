@@ -1,9 +1,9 @@
 (ns com.example.components.ring-middleware
   (:require
     [clojure.string :as str]
-    [com.example.components.auth :as auth]
     [com.example.components.config :as config]
     [com.example.components.parser :as parser]
+    [com.example.lib.session :as session]
     [com.fulcrologic.fulcro.server.api-middleware :as server]
     [hiccup.page :refer [html5]]
     [mount.core :refer [defstate]]
@@ -33,15 +33,12 @@
 (defn wrap-api [handler uri]
   (fn [request]
     (if (= uri (:uri request))
-      ;; Mutations (login/logout) can't return a Ring response, so they leave the new session here
-      (let [session-update (volatile! ::unchanged)
-            response       (server/handle-api-request (:transit-params request)
-                             (fn [query]
-                               (parser/parser {:ring/request          request
-                                               ::auth/session-update session-update}
-                                 query)))]
-        (cond-> response
-          (not= ::unchanged @session-update) (assoc :session @session-update)))
+      ;; Lets mutations change the session (e.g. login/logout) via `session/set-session!`
+      (session/with-session-updates
+        (fn [env-additions]
+          (server/handle-api-request (:transit-params request)
+            (fn [query]
+              (parser/parser (merge {:ring/request request} env-additions) query)))))
       (handler request))))
 
 (def not-found-handler
@@ -84,7 +81,7 @@
 (defstate middleware
   :start
   (let [defaults-config (assoc (:ring.middleware/defaults-config config/config)
-                          :session (session-config (::auth/session config/config)))]
+                          :session (session-config (::session config/config)))]
     (-> not-found-handler
       (wrap-api "/api")
       (server/wrap-transit-params {})

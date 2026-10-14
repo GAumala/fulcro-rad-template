@@ -13,13 +13,9 @@
  ;; SESSION_KEY: 32 hex chars (`openssl rand -hex 16`). Required: it encrypts the session cookie, and keeping it
  ;; stable is what keeps users logged in across restarts/instances. Rotating it logs everybody out.
  ;; SECURE_COOKIES: unset means true (cookies only sent over HTTPS). Set to false only for plain-HTTP local testing.
- :com.example.components.auth/session {:key              :env/SESSION_KEY
-                                       :allow-ephemeral? false
-                                       :secure-cookies?  :env.edn/SECURE_COOKIES}
-
- ;; Bootstraps the first login. Safe to leave set: an existing password is never overwritten.
- :com.example.components.auth/admin   {:email    :env/ADMIN_EMAIL
-                                       :password :env/ADMIN_PASSWORD}
+ :com.example.components.ring-middleware/session {:key              :env/SESSION_KEY
+                                                  :allow-ephemeral? false
+                                                  :secure-cookies?  :env.edn/SECURE_COOKIES}
 
  :com.fulcrologic.rad.pathom/config {:log-requests?  false
                                      :log-responses? false}
