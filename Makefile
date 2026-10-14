@@ -1,4 +1,5 @@
-.PHONY: cljs release test uberjar docker run-jar add-user session-key report
+.PHONY: cljs release test uberjar docker run-jar session-key report
+.PHONY: add-user # AUTH: remove
 
 # Dev: shadow-cljs server (watch builds from its UI at http://localhost:9630, nREPL on 9000)
 cljs:
@@ -21,7 +22,7 @@ uberjar: release
 run-jar:
 	PORT=3000 DATOMIC_STORAGE_DIR=$(CURDIR)/data SECURE_COOKIES=false java -jar target/app.jar
 
-# AUTH: remove this target (and `add-user` in .PHONY).
+# AUTH: remove the next 4 lines
 # Add a login to the ./data database used by run-jar (stop run-jar first), e.g. `make add-user EMAIL=me@example.com`
 add-user:
 	DATOMIC_STORAGE_DIR=$(CURDIR)/data java -cp target/app.jar clojure.main -m com.example.components.auth-cli add-user $(EMAIL)

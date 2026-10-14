@@ -36,7 +36,7 @@
   (d/transact (:main datomic-connections)
     {:tx-data [(account/new-account "tony@example.com" :account/id (new-uuid 100))
                (account/new-account "sally@example.com" :account/id (new-uuid 101) :account/active? false)]})
-  ;; AUTH: remove these users
+  ;; AUTH: remove the next 3 lines
   (auth/add-user! "user@example.com" password)
   (auth/add-user! "disabled@example.com" password)
   (auth/set-active! "disabled@example.com" false)
@@ -66,6 +66,7 @@
   (h/render-frame! app)
   (pr-str (first (hic/find-by-tag (h/hiccup-frame app) :main))))
 
+;; AUTH: remove the next 9 lines
 (defn log-in! [app email password]
   (h/render-frame! app)
   ;; By id: in a form with several labeled inputs, `h/type-into-labeled!` returns the form's FIRST input for any
@@ -78,10 +79,10 @@
 (defn logged-in-app
   "A `test-app` with a user logged in."
   []
-  ;; AUTH: without authentication, make this just (test-app) and delete `log-in!` and `auth-status`
+  ;; AUTH: replace the next line with (test-app))
   (doto (test-app) (log-in! "user@example.com" password)))
 
-(defn auth-status [app] (:ui/auth-status (app/current-state app)))
+(defn auth-status [app] (:ui/auth-status (app/current-state app))) ; AUTH: remove
 
 (defn db-emails
   "Every :account/email in the database."

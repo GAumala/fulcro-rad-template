@@ -121,9 +121,9 @@ general infrastructure.
 
 1. Delete `src/main/com/example/components/auth.clj`, `auth_cli.clj`, `src/main/com/example/session.cljc`,
    `src/main/com/example/ui/login.cljc` and `src/test/com/example/auth_test.clj`.
-2. `grep -rn "AUTH:" src deps.edn Makefile` and do what each comment says (remove the line, or the replacement it
-   describes).
-3. Remove `buddy-hashers` from `deps.edn` (tagged), and this section and the `Auth` row from the README.
+2. `grep -rn "AUTH:" src deps.edn Makefile` and apply each marker: `AUTH: remove` at the end of a line removes
+   that line; `AUTH: remove the next N lines` and `AUTH: replace the next N lines with ...` say what they do.
+3. Remove this section and the `Auth` row from the README.
 
 == Deployment
 

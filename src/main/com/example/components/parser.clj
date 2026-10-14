@@ -35,9 +35,9 @@
 (defstate parser
   :start
   (pathom/new-parser config
-    [;; AUTH: remove. Refuses everything but login/logout/current-user to anonymous requests
+    [(attr/pathom-plugin all-attributes)                    ; Other plugins need the list of attributes. This adds it to env.
+     ;; Refuses everything but login/logout/current-user to anonymous requests. AUTH: remove the next line
      auth/guard-plugin
-     (attr/pathom-plugin all-attributes)                    ; Other plugins need the list of attributes. This adds it to env.
      ;; Install form middleware
      (form/pathom-plugin save/middleware delete/middleware)
      ;; Select database for schema

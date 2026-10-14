@@ -40,18 +40,19 @@
       (dom/main
         (ui-routes routes)))))
 
+;; AUTH: replace the next line with (defsc Root [this props]
 (defsc Root [this {:ui/keys [auth-status login] :as props}]
-  {:query         [:ui/auth-status                          ; AUTH: remove
+  {:query         [{:ui/routes (comp/get-query Routes)}
+                   :ui/auth-status                          ; AUTH: remove
                    :session/current-user                    ; AUTH: remove
                    {:ui/login (comp/get-query LoginPage)}   ; AUTH: remove
-                   {:ui/routes (comp/get-query Routes)}
                    ;; Makes Root re-render when the routing chart changes state
                    [::sc/session-id '_]
                    ::app/active-remotes]
-   :initial-state {:ui/auth-status :checking                ; AUTH: remove
-                   :ui/login       {}                       ; AUTH: remove
+   :initial-state {;; AUTH: remove the next line
+                   :ui/auth-status :checking :ui/login {}
                    :ui/routes      {}}}
-  ;; AUTH: without authentication, replace this `case` with (render-app this props)
+  ;; AUTH: replace the next 5 lines with (render-app this props))
   (case auth-status
     :logged-out (ui-login-page login)
     :logged-in (render-app this props)

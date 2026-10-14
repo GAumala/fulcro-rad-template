@@ -25,14 +25,14 @@
   (dt/set-timezone! "America/Los_Angeles")
   (when-let [connection (:main datomic-connections)]
     (log/info "SEEDING data.")
+    ;; AUTH: remove the next 3 lines
+    (when-not (some #(= "dev@example.com" (:user/email %)) (auth/users))
+      (auth/add-user! "dev@example.com" "letmein"))
+    (log/info "Dev login: dev@example.com / letmein")
     (d/transact connection
       {:tx-data [(account/new-account "tony@example.com" :account/id (new-uuid 100))
                  (account/new-account "sam@example.com" :account/id (new-uuid 101))
-                 (account/new-account "sally@example.com" :account/id (new-uuid 102) :account/active? false)]})
-    ;; AUTH: remove the dev login
-    (when-not (some #(= "dev@example.com" (:user/email %)) (auth/users))
-      (auth/add-user! "dev@example.com" "letmein"))
-    (log/info "Dev login: dev@example.com / letmein")))
+                 (account/new-account "sally@example.com" :account/id (new-uuid 102) :account/active? false)]})))
 
 (defn start []
   (mount/start-with-args {:config "config/dev.edn"})

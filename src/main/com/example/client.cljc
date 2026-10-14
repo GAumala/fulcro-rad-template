@@ -24,7 +24,7 @@
    ;; default time zone (can be changed at login for given user)
    (datetime/set-timezone! "America/Los_Angeles")
    (rad-app/install-statecharts! app {:event-loop? event-loop?})
-   ;; AUTH: without authentication, replace this line with (routes/start-routing! app)
+   ;; AUTH: replace the next line with (routes/start-routing! app)
    (session/check-session! app)
    app))
 
