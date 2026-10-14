@@ -1,5 +1,6 @@
 (ns com.example.components.parser
   (:require
+    [com.example.components.auth :as auth]
     [com.example.components.auto-resolvers :refer [automatic-resolvers]]
     [com.example.components.config :refer [config]]
     [com.example.components.database :refer [datomic-connections]]
@@ -34,7 +35,9 @@
 (defstate parser
   :start
   (pathom/new-parser config
-    [(attr/pathom-plugin all-attributes)                    ; Other plugins need the list of attributes. This adds it to env.
+    [;; Refuses everything but login/logout/current-user to anonymous requests
+     auth/guard-plugin
+     (attr/pathom-plugin all-attributes)                    ; Other plugins need the list of attributes. This adds it to env.
      ;; Install form middleware
      (form/pathom-plugin save/middleware delete/middleware)
      ;; Select database for schema
@@ -49,4 +52,5 @@
               {}))))}]
     [automatic-resolvers
      all-resolvers
+     auth/resolvers
      form/resolvers]))

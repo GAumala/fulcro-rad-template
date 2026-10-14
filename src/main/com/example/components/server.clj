@@ -21,5 +21,11 @@
 ;; Entry point for the uberjar. In development the server is controlled from `src/dev/development.clj`.
 ;; The config file can be overridden with `-Dconfig=/path/to/file.edn`.
 (defn -main [& _args]
-  (mount/start-with-args {:config "config/prod.edn"})
+  (try
+    (mount/start-with-args {:config "config/prod.edn"})
+    (catch Throwable e
+      ;; Exit instead of leaving a half-started JVM running (Datomic threads would keep it alive),
+      ;; so Docker/systemd see the failure and restart or alert.
+      (log/error e "Startup failed")
+      (System/exit 1)))
   (.addShutdownHook (Runtime/getRuntime) (Thread. ^Runnable mount/stop)))

@@ -5,8 +5,9 @@
     #?@(:cljs [[com.fulcrologic.fulcro.algorithms.timbre-support :refer [console-appender prefix-output-fn]]
                [fulcro.inspect.tool :as inspect]])
     [com.example.application :refer [SPA]]
+    [com.example.session :as session]
     [com.example.ui.render.plugin]                          ; registers the RAD renderers
-    [com.example.ui.root :refer [Root routing-chart]]
+    [com.example.ui.root :refer [Root]]
     [com.fulcrologic.fulcro.application :as app]
     [com.fulcrologic.fulcro.components :as comp]
     [com.fulcrologic.fulcro.networking.http-remote :as net]
@@ -15,17 +16,14 @@
     [taoensso.timbre :as log]))
 
 (defn start!
-  "Installs statecharts, starts the routing chart, and marks the app ready.
-   `:event-loop?` is `true` in the browser and `:immediate` in CLJ tests."
+  "Installs statecharts and checks the session. Routing starts once someone is logged in
+   (see `com.example.session`). `:event-loop?` is `true` in the browser and `:immediate` in CLJ tests."
   ([app] (start! app {}))
   ([app {:keys [event-loop?] :or {event-loop? true}}]
    ;; default time zone (can be changed at login for given user)
    (datetime/set-timezone! "America/Los_Angeles")
    (rad-app/install-statecharts! app {:event-loop? event-loop?})
-   (rad-app/start-routing! app routing-chart)
-   ;; Keeps the browser URL and the routing chart in sync (and restores the route on page load)
-   #?(:cljs (rad-app/install-url-sync! app))
-   (swap! (::app/state-atom app) assoc :ui/ready? true)
+   (session/check-session! app)
    app))
 
 #?(:cljs

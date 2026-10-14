@@ -8,6 +8,14 @@
                             :system      "dev"}
          :datomic/database "example"}}
 
+ ;; Session cookie. Without a :key a random one is generated at startup (dev only; prod.edn requires one).
+ :com.example.components.auth/session {:key              nil
+                                       :allow-ephemeral? true
+                                       :secure-cookies?  false}
+
+ ;; When both are set, an account with this login is created at startup if it has no password yet.
+ :com.example.components.auth/admin   {:email nil :password nil}
+
  :ring.middleware/defaults-config   {:params    {:keywordize true
                                                  :multipart  true
                                                  :nested     true

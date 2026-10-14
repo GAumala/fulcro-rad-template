@@ -13,15 +13,16 @@ toc::[]
 
 [cols="1,3"]
 |===
-| Client | Fulcro 3.10 + RAD 1.6 + `fulcro-rad-statecharts`. One routing statechart (`ui/root.cljc`) is the router.
+| Client | Fulcro 3.10 + RAD 1.6 + `fulcro-rad-statecharts`. One routing statechart (`ui/routes.cljc`) is the router.
 | Rendering | `com.example.ui.render.*`: plain HTML renderers, *owned by this app* (no UI plugin library). Restyle them with your design system.
 | Server | http-kit + Ring, Pathom 2 with RAD's generated resolvers, `mount` for lifecycle
 | Database | Datomic via the client API (`fulcro-rad-datomic`). In-memory in dev, on-disk Datomic Local in prod.
-| Tests | Headless end-to-end tests: real client + real parser + in-memory Datomic in one JVM. No browser.
+| Auth | Email/password login (bcrypt hashes in Datomic), encrypted cookie sessions, every API call guarded. See <<Authentication>>.
+| Tests | Headless end-to-end tests: real client + real Ring handler + parser + in-memory Datomic in one JVM. No browser.
 | Deploy | `build.clj` uberjar, `Dockerfile`, `config/prod.edn` driven by env vars
 |===
 
-Not included (deliberately): authentication/authorization, file uploads (RAD blob support), a CSS framework.
+Not included (deliberately): roles/permissions, sign-up and password reset, file uploads (RAD blob support), a CSS framework.
 
 == Start a new project
 
@@ -45,6 +46,7 @@ make cljs             # shadow-cljs server; start the `main` watch at http://loc
 $ clj -A:dev
 user=> (require 'development)
 user=> (development/start)    ; server on http://localhost:3000, seeded in-memory Datomic
+                              ; log in as tony@example.com / letmein
 user=> (development/restart)  ; stop, reload source, start
 ----
 
@@ -55,7 +57,7 @@ user=> (development/restart)  ; stop, reload source, start
 * *Model*: RAD attributes in `model_rad/`, hand-written resolvers in `model/`. Unchanged from standard RAD.
 * *Forms and reports*: `defsc-form` / `defsc-report` from `com.fulcrologic.rad.statechart.form` / `.report`.
   Option keys (`fo/`, `ro/`) are the standard RAD ones.
-* *Routing*: every page is a state in `routing-chart` (`ui/root.cljc`). Navigate with `scr/route-to!`,
+* *Routing*: every page is a state in `routing-chart` (`ui/routes.cljc`). Navigate with `scr/route-to!`,
   `form/edit!`, `form/create!`. URLs come from `:route/segment` in the chart; `fo/route-prefix` and `ro/route`
   are ignored.
 * *Unsaved changes*: leaving a dirty form puts the routing chart in `:routing-info/open`; `Root` shows a prompt
@@ -69,6 +71,24 @@ user=> (development/restart)  ; stop, reload source, start
 2. Add classes in `ui/render/*.cljc` (`input input-bordered`, `btn btn-primary`, `table`...). Write full,
    literal class strings: Tailwind only finds classes it can see in the source. Point its `content` at `src/**/*.cljc`.
 3. Keep the `data-rad-*` attributes; the tests use them.
+
+== Authentication
+
+* *Credentials*: `:account/password-hash` holds a bcrypt hash (`buddy-hashers`). It is plain Datomic schema in
+  `components/auth.clj`, deliberately *not* a RAD attribute: RAD generates resolvers for its attributes, which would
+  let any client query the hash. It is `:db/noHistory`, so replaced hashes aren't kept.
+* *Sessions*: the logged-in account id is stored in an encrypted session cookie (Ring's cookie store, key from
+  `SESSION_KEY`). Nothing is stored server side, so sessions survive restarts and work across instances.
+  Login rotates the session to prevent session fixation.
+* *Guard*: `auth/guard-plugin` (a Pathom plugin) refuses every resolver and mutation to anonymous requests except
+  `login`, `logout` and `:session/current-user`. Add role or ownership checks there.
+* *Client*: `com.example.session` asks the server who is logged in at startup. Routing only starts once someone is
+  logged in; in the browser, URL sync then restores the URL the user arrived on. Logout reloads the page.
+* *Users*: accounts log in with their email. Set passwords with `(com.example.components.auth/set-password! email pw)`
+  from a REPL. In production, `ADMIN_EMAIL`/`ADMIN_PASSWORD` create the first login at startup (an existing password
+  is never overwritten). There is no UI yet to set passwords, sign up, or reset a forgotten password.
+* *Not covered*: login rate limiting / lockout, and revoking sessions. A deactivated account can't log in, but a
+  session it already has stays valid until logout or `SESSION_KEY` rotation.
 
 == Deployment
 
@@ -87,19 +107,21 @@ Runtime configuration (`config/prod.edn`, deep-merged over `config/defaults.edn`
 |===
 | `PORT` | HTTP port
 | `DATOMIC_STORAGE_DIR` | Absolute path for Datomic Local storage. *Must be persistent* (a volume); the Docker image uses `/data`.
+| `SESSION_KEY` | *Required.* 32 hex chars (`make session-key`) encrypting the session cookie. Keep it stable and secret; changing it logs everybody out.
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Create the first login at startup if that account has no password yet.
+| `SECURE_COOKIES` | Unset = `true` (cookie sent over HTTPS only). Set `false` only to test over plain HTTP (`make run-jar` does).
 | `-Dconfig=/path.edn` | Replace `prod.edn` entirely, e.g. to point at Datomic Pro or Cloud instead of Datomic Local
 |===
 
-The schema is created/migrated automatically from your attributes at startup.
+The schema is created/migrated automatically from your attributes at startup. If startup fails (e.g. no
+`SESSION_KEY`), the process exits with code 1.
 
 Things to decide before going to production:
 
 * *TLS*: terminate at a proxy/load balancer (HSTS is on, `:ssl-redirect` is off).
-* *Sessions*: Ring's default session store is in memory, so sessions (and the CSRF token tied to them) are lost on
-  restart and are not shared between instances. Use a cookie or database-backed store if that matters.
 * *Datomic topology*: Datomic Local is a single process writing to local disk, so run exactly one instance.
   Scaling out means Datomic Pro (transactor + storage) or Datomic Cloud.
-* *Auth*: none is included.
+* *Auth*: review <<Authentication>> for what's not covered (rate limiting, password management UI, roles).
 
 == LICENSE
 

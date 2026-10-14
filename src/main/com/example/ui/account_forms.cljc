@@ -4,7 +4,7 @@
    standard RAD ones.
 
    URLs are NOT set here: `fo/route-prefix` / `ro/route` are ignored by statecharts routing.
-   Use `:route/segment` in the routing chart (see `com.example.ui.root`)."
+   Use `:route/segment` in the routing chart (see `com.example.ui.routes`)."
   (:require
     [clojure.string :as str]
     [com.example.model-rad.account :as r.account]

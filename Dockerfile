@@ -25,6 +25,7 @@ WORKDIR /app
 COPY --from=build /app/target/app.jar app.jar
 ENV PORT=3000 \
     DATOMIC_STORAGE_DIR=/data
+# Also required at runtime: SESSION_KEY (`make session-key`), and ADMIN_EMAIL/ADMIN_PASSWORD on first start.
 # Datomic Local writes here: mount a persistent volume or you lose data on redeploy
 VOLUME /data
 EXPOSE 3000
