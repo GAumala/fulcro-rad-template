@@ -1,4 +1,5 @@
 (ns com.example.components.server
+  (:gen-class)
   (:require
     [org.httpkit.server :refer [run-server]]
     [mount.core :as mount :refer [defstate]]
@@ -17,6 +18,8 @@
     (when stop
       (stop))))
 
-;; This is a separate file for the uberjar only. We control the server in dev mode from src/dev/user.clj
-(defn -main [& args]
-  (mount/start-with-args {:config "config/prod.edn"}))
+;; Entry point for the uberjar. In development the server is controlled from `src/dev/development.clj`.
+;; The config file can be overridden with `-Dconfig=/path/to/file.edn`.
+(defn -main [& _args]
+  (mount/start-with-args {:config "config/prod.edn"})
+  (.addShutdownHook (Runtime/getRuntime) (Thread. ^Runnable mount/stop)))

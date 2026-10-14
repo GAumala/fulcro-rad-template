@@ -1,54 +1,105 @@
-= Fulcro RAD Template
+= RAD Statecharts Template
+:toc: macro
 
-A RAD template with Datomic Cloud preconfigured. Relatively easy to swap out back-end.
+A UI-agnostic starting point for a full-stack https://github.com/fulcrologic/fulcro-rad[Fulcro RAD] app using
+https://github.com/fulcrologic/fulcro-rad-statecharts[fulcro-rad-statecharts]: forms, reports and routing are driven by
+statecharts instead of UI state machines and dynamic routing.
 
-== Usage
+Derived from https://github.com/fulcrologic/fulcro-rad-template[fulcro-rad-template].
 
-Clone this repository (it is a template repo), and then use the `rename-project.sh`
-script to set your desired package name:
+toc::[]
 
-[source, bash]
------
-$ ./rename-project.sh com.my-domain.app-name
------
+== What's in the box
 
-Be sure to use hyphens, NOT underscores. The rename script will correct the filenames
-accordingly.
+[cols="1,3"]
+|===
+| Client | Fulcro 3.10 + RAD 1.6 + `fulcro-rad-statecharts`. One routing statechart (`ui/root.cljc`) is the router.
+| Rendering | `com.example.ui.render.*`: plain HTML renderers, *owned by this app* (no UI plugin library). Restyle them with your design system.
+| Server | http-kit + Ring, Pathom 2 with RAD's generated resolvers, `mount` for lifecycle
+| Database | Datomic via the client API (`fulcro-rad-datomic`). In-memory in dev, on-disk Datomic Local in prod.
+| Tests | Headless end-to-end tests: real client + real parser + in-memory Datomic in one JVM. No browser.
+| Deploy | `build.clj` uberjar, `Dockerfile`, `config/prod.edn` driven by env vars
+|===
 
-The project should now build and run.
+Not included (deliberately): authentication/authorization, file uploads (RAD blob support), a CSS framework.
 
-== Building the SPA
+== Start a new project
 
-You must compile the CLJS source to run the client. If you want to be
-able to edit it, just start a shadow-cljs watch:
+[source,bash]
+----
+./rename-project.sh com.my-domain.app-name   # use hyphens, not underscores
+pnpm install                                 # npm/yarn are refused
+----
 
-[source, bash]
------
-$ pnpm install
-$ pnpm exec shadow-cljs watch main
------
+A `mise.toml` pins Java 21, Clojure and Node 24 (`mise install`). pnpm is provided by corepack (`corepack enable`).
 
-This project uses https://pnpm.io[pnpm]; `npm` and `yarn` are refused.
+== Development
 
-== Running the Server
+[source,bash]
+----
+make cljs             # shadow-cljs server; start the `main` watch at http://localhost:9630
+----
 
-The server in this template uses an in-memory datomic-free database. You can start it from the REPL by including the
-deps `:dev` alias.
-
-[source, bash]
------
+[source,bash]
+----
 $ clj -A:dev
-user=> (clojure.core/require 'development)
-user=> (development/start)
------
+user=> (require 'development)
+user=> (development/start)    ; server on http://localhost:3000, seeded in-memory Datomic
+user=> (development/restart)  ; stop, reload source, start
+----
 
-== Restarting
+`make test` runs the headless end-to-end tests (`src/test/com/example/app_test.clj`).
 
-There are `stop`, `start`, `fast-restart`, and `restart` functions in `development`.
-The `restart` function will stop the server, reload all source, and start it again. You can often get by
-with manually evaluating functions with a running server, but if you modify something that is closed over during
-start (such as a function that is embedded in the middleware) you'll have to load the appropriate files and stop/start.
-While the source is small it is often less hassle to just use `restart`.
+== How the pieces fit
+
+* *Model*: RAD attributes in `model_rad/`, hand-written resolvers in `model/`. Unchanged from standard RAD.
+* *Forms and reports*: `defsc-form` / `defsc-report` from `com.fulcrologic.rad.statechart.form` / `.report`.
+  Option keys (`fo/`, `ro/`) are the standard RAD ones.
+* *Routing*: every page is a state in `routing-chart` (`ui/root.cljc`). Navigate with `scr/route-to!`,
+  `form/edit!`, `form/create!`. URLs come from `:route/segment` in the chart; `fo/route-prefix` and `ro/route`
+  are ignored.
+* *Unsaved changes*: leaving a dirty form puts the routing chart in `:routing-info/open`; `Root` shows a prompt
+  calling `scr/abandon-route-change!` or `scr/force-continue-routing!`.
+* *Rendering*: requiring `com.example.ui.render.plugin` registers `defmethod`s on RAD's rendering multimethods.
+
+=== Adding a design system (e.g. Tailwind + DaisyUI)
+
+1. Add your CSS build (e.g. the Tailwind CLI with DaisyUI) writing to `resources/public/css/main.css`,
+   and uncomment the stylesheet link in `components/ring_middleware.clj`.
+2. Add classes in `ui/render/*.cljc` (`input input-bordered`, `btn btn-primary`, `table`...). Write full,
+   literal class strings: Tailwind only finds classes it can see in the source. Point its `content` at `src/**/*.cljc`.
+3. Keep the `data-rad-*` attributes; the tests use them.
+
+== Deployment
+
+The app is a single JVM process: http-kit serves the API and the compiled JS.
+
+[source,bash]
+----
+make uberjar          # shadow-cljs release + target/app.jar
+make run-jar          # runs it with config/prod.edn, Datomic stored in ./data
+make docker           # or build the image
+----
+
+Runtime configuration (`config/prod.edn`, deep-merged over `config/defaults.edn`):
+
+[cols="1,3"]
+|===
+| `PORT` | HTTP port
+| `DATOMIC_STORAGE_DIR` | Absolute path for Datomic Local storage. *Must be persistent* (a volume); the Docker image uses `/data`.
+| `-Dconfig=/path.edn` | Replace `prod.edn` entirely, e.g. to point at Datomic Pro or Cloud instead of Datomic Local
+|===
+
+The schema is created/migrated automatically from your attributes at startup.
+
+Things to decide before going to production:
+
+* *TLS*: terminate at a proxy/load balancer (HSTS is on, `:ssl-redirect` is off).
+* *Sessions*: Ring's default session store is in memory, so sessions (and the CSRF token tied to them) are lost on
+  restart and are not shared between instances. Use a cookie or database-backed store if that matters.
+* *Datomic topology*: Datomic Local is a single process writing to local disk, so run exactly one instance.
+  Scaling out means Datomic Pro (transactor + storage) or Datomic Cloud.
+* *Auth*: none is included.
 
 == LICENSE
 

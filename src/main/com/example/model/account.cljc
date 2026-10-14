@@ -4,10 +4,10 @@
    DO NOT require a RAD model file in this ns. This ns is meant to be an ultimate
    leaf of the requires. Only include library code."
   (:require
-    [com.wsscode.pathom.connect :as pc :refer [defresolver defmutation]]
-    [com.fulcrologic.rad.database-adapters.datomic-options :as do]
+    #?@(:clj [[com.wsscode.pathom.connect :as pc :refer [defresolver]]
+              [com.fulcrologic.rad.database-adapters.datomic-options :as do]
+              [datomic.client.api :as d]])
     [com.fulcrologic.rad.ids :refer [new-uuid]]
-    [datomic.client.api :as d]
     [taoensso.timbre :as log]))
 
 (defn new-account
@@ -41,4 +41,4 @@
      {::pc/output [{:account/all-accounts [:account/id]}]}
      {:account/all-accounts (get-all-accounts env params)}))
 
-(def resolvers [all-accounts-resolver])
+(def resolvers #?(:clj [all-accounts-resolver] :cljs []))

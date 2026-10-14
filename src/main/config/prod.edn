@@ -1,17 +1,35 @@
-{ :ring.middleware/defaults-config {:params    {:keywordize true
-                                               :multipart  true
-                                               :nested     true
-                                               :urlencoded true}
-                                   :cookies   true
-                                   :responses {:absolute-redirects     true
-                                               :content-types          true
-                                               :default-charset        "utf-8"
-                                               :not-modified-responses true}
-                                   :session   true
-                                   :static    {:resources "public"}
-                                   :security  {:anti-forgery   true
-                                               :hsts           true
-                                               :ssl-redirect   false
-                                               :frame-options  :sameorigin
-                                               :xss-protection {:enable? true
-                                                                :mode    :block}}}}
+;; Deep-merged over defaults.edn. `:env/VAR` reads an environment variable as a string,
+;; `:env.edn/VAR` reads it as EDN (numbers, maps, ...). Override the whole file with -Dconfig=/path.edn
+{:org.httpkit.server/config         {:port :env.edn/PORT}
+
+ ;; Datomic Local persisted to disk. DATOMIC_STORAGE_DIR must be an absolute path on a
+ ;; persistent volume. To use Datomic Pro (peer server) or Datomic Cloud instead, replace
+ ;; this client map; the code uses the Datomic client API either way.
+ :com.fulcrologic.rad.database-adapters.datomic/databases
+ {:main {:datomic/client {:server-type :datomic-local
+                          :storage-dir :env/DATOMIC_STORAGE_DIR
+                          :system      "app"}}}
+
+ :com.fulcrologic.rad.pathom/config {:log-requests?  false
+                                     :log-responses? false}
+
+ :taoensso.timbre/logging-config    {:min-level :info}
+
+ :ring.middleware/defaults-config   {:params    {:keywordize true
+                                                 :multipart  true
+                                                 :nested     true
+                                                 :urlencoded true}
+                                     :cookies   true
+                                     :responses {:absolute-redirects     true
+                                                 :content-types          true
+                                                 :default-charset        "utf-8"
+                                                 :not-modified-responses true}
+                                     :session   true
+                                     :static    {:resources "public"}
+                                     ;; :ssl-redirect is off because TLS is expected to terminate at a proxy/load balancer
+                                     :security  {:anti-forgery   true
+                                                 :hsts           true
+                                                 :ssl-redirect   false
+                                                 :frame-options  :sameorigin
+                                                 :xss-protection {:enable? true
+                                                                  :mode    :block}}}}

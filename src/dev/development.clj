@@ -4,8 +4,10 @@
     [com.example.components.database :refer [datomic-connections]]
     [com.example.components.ring-middleware]
     [com.example.components.server]
+    [com.example.model.account :as account]
     [com.fulcrologic.rad.ids :refer [new-uuid]]
     [com.fulcrologic.rad.type-support.date-time :as dt]
+    [datomic.client.api :as d]
     [mount.core :as mount]
     [taoensso.timbre :as log]))
 
@@ -16,12 +18,16 @@
   (let [db (d/db (:main datomic-connections))]
     (d/pull db '[*] [:account/id (new-uuid 100)])))
 
-(defn seed! []
+(defn seed!
+  "Adds sample data. Fixed ids make it safe to run repeatedly."
+  []
   (dt/set-timezone! "America/Los_Angeles")
-  (let [connection (:main datomic-connections)]
-    (when connection
-      (log/info "SEEDING data.")
-      )))
+  (when-let [connection (:main datomic-connections)]
+    (log/info "SEEDING data.")
+    (d/transact connection
+      {:tx-data [(account/new-account "tony@example.com" :account/id (new-uuid 100))
+                 (account/new-account "sam@example.com" :account/id (new-uuid 101))
+                 (account/new-account "sally@example.com" :account/id (new-uuid 102) :account/active? false)]})))
 
 (defn start []
   (mount/start-with-args {:config "config/dev.edn"})
@@ -34,7 +40,7 @@
   (mount/stop))
 
 (defn fast-restart
-  "Stop, refresh, and restart the server."
+  "Stop and restart the server, without reloading source."
   []
   (stop)
   (start))

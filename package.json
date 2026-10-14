@@ -1,7 +1,7 @@
 {
-  "name": "fulcro-rad-tempate",
+  "name": "rad-statecharts-template",
   "version": "1.0.0",
-  "description": "A template for building Fulcro RAD apps",
+  "description": "A UI-agnostic template for Fulcro RAD apps using statecharts",
   "packageManager": "pnpm@11.21.0",
   "devEngines": {
     "packageManager": {
@@ -10,16 +10,13 @@
     }
   },
   "dependencies": {
-    "@js-joda/core": "4.3.1",
-    "@js-joda/timezone": "2.15.0",
-    "big.js": "6.1.1",
-    "intl-messageformat": "9.13.0",
-    "react": "17.0.2",
-    "react-dom": "17.0.2",
-    "semantic-ui-react": "2.1.4",
-    "victory": "36.6.8"
+    "@js-joda/core": "5.7.0",
+    "@js-joda/timezone": "2.23.0",
+    "big.js": "7.0.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
   },
   "devDependencies": {
-    "shadow-cljs": "2.15.12"
+    "shadow-cljs": "3.3.6"
   }
 }

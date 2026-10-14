@@ -1,4 +1,4 @@
-name: pnpm
+name: ci
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 permissions: read-all
 
 jobs:
-  compile:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -24,4 +24,6 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec shadow-cljs compile ci-tests
+      - run: clojure -M:dev:test:run-tests
+      - run: pnpm exec shadow-cljs release main
+      - run: clojure -T:build uber

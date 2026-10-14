@@ -6,13 +6,11 @@
    as a default form validator and attribute lookup."
   (:require
     [com.example.model-rad.account :as account]
-    [com.example.model-rad.file :as m.file]
     [com.fulcrologic.rad.attributes :as attr]))
 
 (def all-attributes (into []
                       (concat
-                        account/attributes
-                        m.file/attributes)))
+                        account/attributes)))
 
 (def key->attribute (attr/attribute-map all-attributes))
 

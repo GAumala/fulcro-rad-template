@@ -22,10 +22,4 @@
    fo/default-value true
    ao/schema        :production})
 
-(defattr files :account/files :ref
-  {ao/target      :file/id
-   ao/cardinality :many
-   ao/identities  #{:account/id}
-   ao/schema      :production})
-
-(def attributes [id email active? files])
+(def attributes [id email active?])

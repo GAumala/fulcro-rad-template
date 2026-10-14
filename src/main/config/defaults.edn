@@ -2,48 +2,11 @@
 
  :com.fulcrologic.rad.database-adapters.datomic/databases
  {:main {:datomic/schema   :production
-         :datomic/client   {:server-type :dev-local
+         ;; In-memory Datomic Local: data is lost on restart. prod.edn switches to on-disk storage.
+         :datomic/client   {:server-type :datomic-local
                             :storage-dir :mem
-                            :system      "ci"}
+                            :system      "dev"}
          :datomic/database "example"}}
-
- :roterski.fulcro.rad.database-adapters.xtdb/databases
- {:main {
-         ;; leave empty for in-memory xtdb
-         ;; or uncomment a map below for postgres-based xtdb but first you need to manually create the fulcro-rad-demo db in postgres
-         ;; this map is passed through symbolize-xtdb-modules (so you can store :xtdb/module values as strings)
-         ;; and then passed directly into xtdb.api/start-node
-         ;; for all available options see https://xtdb.com/reference/configuration.html
-         ;;
-         ;;  :xtdb.jdbc/connection-pool {:dialect #:xtdb{:module "xtdb.jdbc.psql/->dialect"}
-         ;;                              :db-spec {:dbname   "fulcro-rad-demo"
-         ;;                                        :user     "postgres"
-         ;;                                        :password "postgres"}}
-         ;;  :xtdb/tx-log               {:xtdb/module "xtdb.jdbc/->tx-log"
-         ;;                              :connection-pool :xtdb.jdbc/connection-pool}
-         ;;  :xtdb/document-store       {:xtdb/module "xtdb.jdbc/->document-store"
-         ;;                              :connection-pool :xtdb.jdbc/connection-pool}
-         }}
- :com.fulcrologic.rad.database-adapters.sql/databases
- ;; Sample for PostgreSQL
- #_{:main {:flyway/migrate?          false
-           :flyway/migrations        ["classpath:config/sql_migrations"]
-           :hikaricp/config          {"dataSourceClassName"     "org.postgresql.ds.PGSimpleDataSource"
-                                      "dataSource.serverName"   "localhost"
-                                      "dataSource.user"         "postgres"
-                                      "dataSource.databaseName" "demo"}
-           :sql/vendor               :postgresql
-           :sql/auto-create-missing? true
-           :sql/schema               :production}}
- {:main {:flyway/migrate?          false
-         :flyway/migrations        ["classpath:config/sql_migrations"]
-         :hikaricp/config          {"dataSourceClassName" "org.h2.jdbcx.JdbcDataSource"
-                                    "dataSource.user"     "sa"
-                                    "dataSource.password" "sa"
-                                    "dataSource.URL"      "jdbc:h2:mem:dev-db"}
-         :sql/vendor               :h2
-         :sql/auto-create-missing? true
-         :sql/schema               :production}}
 
  :ring.middleware/defaults-config   {:params    {:keywordize true
                                                  :multipart  true
