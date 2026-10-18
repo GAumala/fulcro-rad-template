@@ -23,7 +23,9 @@
            ring/ring-defaults                      {:mvn/version "0.7.0"}
            ring/ring-core                          {:mvn/version "1.15.3"}
            http-kit/http-kit                       {:mvn/version "2.8.1"}
-           nrepl/nrepl                             {:mvn/version "1.8.0"} ; REPL into the running server (opt-in)
+           ;; REPL into the running server (opt-in). Keep it at the version shadow-cljs uses: this top-level pin
+           ;; also applies in dev, and newer nREPL makes shadow-cljs's nREPL warn about a missing piggieback.
+           nrepl/nrepl                             {:mvn/version "1.3.1"}
            buddy/buddy-hashers                     {:mvn/version "2.0.167"} ; AUTH: remove
            com.datomic/local                       {:mvn/version "1.0.291"}
            com.datomic/client-cloud                {:mvn/version "1.0.131"}
