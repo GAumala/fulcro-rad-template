@@ -124,7 +124,7 @@ inspect data or fix things without a restart. The uberjar contains a client:
 
 [source,bash]
 ----
-# on the server (or `make repl-jar` against `make run-jar` locally)
+# on the server (or `make repl-jar`, which uses $NREPL_PORT)
 java -cp app.jar clojure.main -m nrepl.cmdline --connect --host 127.0.0.1 --port 7888
 
 # Docker: the port is inside the container, so connect from inside it
@@ -211,9 +211,23 @@ The app is a single JVM process: http-kit serves the API and the compiled JS.
 [source,bash]
 ----
 make uberjar          # shadow-cljs release + target/app.jar
-make run-jar          # runs it with config/prod.edn, Datomic stored in ./data
+make run-jar          # runs it exactly like production: config/prod.edn + your environment
 make docker           # or build the image
 ----
+
+==== Running the jar locally
+
+The jar always uses `config/prod.edn`, so set what it reads, e.g.:
+
+[source,bash]
+----
+export PORT=3000 DATOMIC_STORAGE_DIR="$PWD/data" SESSION_KEY=$(make -s session-key)
+export SECURE_COOKIES=false   # plain HTTP: without this the browser never sends the session cookie and login fails
+export NREPL_PORT=7888        # optional, for `make repl-jar`
+make run-jar
+----
+
+Keep `SESSION_KEY` stable between runs if you want to stay logged in.
 
 Runtime configuration (`config/prod.edn`, deep-merged over `config/defaults.edn`):
 
@@ -224,7 +238,7 @@ Runtime configuration (`config/prod.edn`, deep-merged over `config/defaults.edn`
 | `SESSION_KEY` | *Required.* 32 hex chars (`make session-key`) encrypting the session cookie. Nothing is stored server side, so sessions survive restarts and work across instances. Keep it stable and secret; changing it logs everybody out.
 | `NREPL_PORT` | Optional. Starts an nREPL server on 127.0.0.1 for <<Operating the live server>>.
 | `BACKUP_DIR` | Optional. Where `backup!` writes (see <<Backups>>); `/backups` in the Docker image.
-| `SECURE_COOKIES` | Unset = `true` (cookie sent over HTTPS only). Set `false` only to test over plain HTTP (`make run-jar` does).
+| `SECURE_COOKIES` | Unset = `true` (cookie sent over HTTPS only). Set `false` only to test over plain HTTP (see <<Running the jar locally>>).
 | `-Dconfig=/path.edn` | Replace `prod.edn` entirely, e.g. to point at Datomic Pro or Cloud instead of Datomic Local
 |===
 

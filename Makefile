@@ -16,14 +16,14 @@ test:
 uberjar: release
 	clojure -T:build uber
 
-# Run the uberjar like production would, with Datomic persisted under ./data.
-# Needs SESSION_KEY (see `make session-key`). Plain HTTP locally, so cookies can't be Secure-only.
+# Run the uberjar exactly like production: config/prod.edn, with values from your environment
+# (startup names any missing variable; see "Running the jar locally" in the README)
 run-jar:
-	PORT=3000 NREPL_PORT=7888 DATOMIC_STORAGE_DIR=$(CURDIR)/data SECURE_COOKIES=false java -jar target/app.jar
+	java -jar target/app.jar
 
-# REPL into the server started by run-jar (e.g. to add users), using the nREPL client inside the jar
+# REPL into a running jar (e.g. to add users) on $NREPL_PORT, using the nREPL client inside the jar
 repl-jar:
-	java -cp target/app.jar clojure.main -m nrepl.cmdline --connect --host 127.0.0.1 --port 7888
+	java -cp target/app.jar clojure.main -m nrepl.cmdline --connect --host 127.0.0.1 --port $${NREPL_PORT:?set NREPL_PORT to the port the server uses}
 
 # A new random SESSION_KEY (keep it stable: changing it logs everybody out)
 session-key:
