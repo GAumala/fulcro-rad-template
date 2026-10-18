@@ -19,7 +19,7 @@ die() { printf 'Error: %s\n' "$*" >&2; exit 1; }
 
 # Piped into sh, stdin is this script, so answers come from the terminal.
 ask() { # prompt default -> answer
-  if [ -r /dev/tty ]; then
+  if (: < /dev/tty) 2> /dev/null; then # a terminal we can actually open (exists but fails in CI)
     printf '%s' "$1" > /dev/tty
     read -r answer < /dev/tty || answer=""
   else
