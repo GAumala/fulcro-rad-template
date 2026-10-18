@@ -39,7 +39,7 @@ pnpm install          # npm/yarn are refused
 
 [source,bash]
 ----
-make cljs             # shadow-cljs server; start the `main` watch at http://localhost:9630
+make cljs             # compiles the app and recompiles on save; shadow-cljs UI at http://localhost:9630
 ----
 
 [source,bash]

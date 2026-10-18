@@ -1,8 +1,9 @@
 .PHONY: cljs release test uberjar docker run-jar repl-jar session-key report
 
-# Dev: shadow-cljs server (watch builds from its UI at http://localhost:9630, nREPL on 9000)
+# Dev: compiles the app and recompiles on save (hot reload). Also starts the shadow-cljs server
+# (UI at http://localhost:9630, nREPL on 9000), or attaches to one that is already running.
 cljs:
-	pnpm exec shadow-cljs server
+	pnpm exec shadow-cljs watch main
 
 # Production CLJS bundle -> resources/public/js/main
 release:

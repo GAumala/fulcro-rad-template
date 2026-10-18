@@ -8,7 +8,7 @@ A full-stack https://github.com/fulcrologic/fulcro-rad[Fulcro RAD] application (
 ----
 mise trust && mise install   # Java, Clojure, Node and pnpm, pinned in mise.toml
 pnpm install
-make cljs                    # shadow-cljs; start the `main` watch at http://localhost:9630
+make cljs                    # compiles the app and recompiles on save (shadow-cljs UI: http://localhost:9630)
 ----
 
 In another terminal:
