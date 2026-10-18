@@ -1,0 +1,28 @@
+= {{PROJECT_NAME}}
+
+A full-stack https://github.com/fulcrologic/fulcro-rad[Fulcro RAD] application (namespace `{{NAMESPACE}}`).
+
+== Quick start
+
+[source,bash]
+----
+mise trust && mise install   # Java, Clojure, Node and pnpm, pinned in mise.toml
+pnpm install
+make cljs                    # shadow-cljs; start the `main` watch at http://localhost:9630
+----
+
+In another terminal:
+
+[source,bash]
+----
+$ clj -A:dev
+user=> (require 'development)
+user=> (development/start)   ; http://localhost:3000, log in as dev@example.com / letmein
+----
+
+`make test` runs the tests.
+
+== Documentation
+
+The link:docs/user-guide.adoc[User Guide] covers development, authentication and user management, operating the
+live server, backups, configuration and deployment.

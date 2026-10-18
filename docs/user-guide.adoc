@@ -1,0 +1,302 @@
+= User Guide
+:toc: macro
+:toclevels: 3
+
+How to work on and operate this Fulcro RAD application. It was generated from a template that uses
+https://github.com/fulcrologic/fulcro-rad-statecharts[fulcro-rad-statecharts]: forms, reports and routing are
+driven by statecharts instead of UI state machines and dynamic routing.
+
+toc::[]
+
+== What's in the box
+
+[cols="1,3"]
+|===
+| Client | Fulcro 3.10 + RAD 1.6 + `fulcro-rad-statecharts`. One routing statechart (`ui/routes.cljc`) is the router.
+| Rendering | `com.example.ui.render.*`: plain HTML renderers, *owned by this app* (no UI plugin library). Restyle them with your design system.
+| Server | http-kit + Ring, Pathom 2 with RAD's generated resolvers, `mount` for lifecycle
+| Database | Datomic via the client API (`fulcro-rad-datomic`). In-memory in dev, on-disk Datomic Local in prod.
+| Auth | Users with email/password login (bcrypt hashes in Datomic), every API call guarded, users managed from the live server's REPL. Easy to remove. See <<Authentication>>.
+| Tests | Headless end-to-end tests: real client + real Ring handler + parser + in-memory Datomic in one JVM. No browser.
+| Deploy | `build.clj` uberjar, `Dockerfile`, `config/prod.edn` driven by env vars
+|===
+
+Not included (deliberately): roles/permissions, sign-up and password reset, file uploads (RAD blob support), a CSS framework.
+
+== Setup
+
+A `mise.toml` pins Java 21, Clojure, Node 24 and pnpm, so `mise install` sets up everything (run `mise trust` first
+in a fresh checkout). pnpm must be the version in `package.json`'s `packageManager` (`devEngines` refuses others),
+so update both together. Without mise, `corepack enable` also provides that pnpm version.
+
+[source,bash]
+----
+mise install
+pnpm install          # npm/yarn are refused
+----
+
+== Development
+
+[source,bash]
+----
+make cljs             # shadow-cljs server; start the `main` watch at http://localhost:9630
+----
+
+[source,bash]
+----
+$ clj -A:dev
+user=> (require 'development)
+user=> (development/start)    ; server on http://localhost:3000, seeded in-memory Datomic
+                              ; log in as dev@example.com / letmein
+user=> (development/restart)  ; stop, reload source, start
+----
+
+`make test` runs the headless end-to-end tests (`src/test/com/example/app_test.clj`).
+
+== How the pieces fit
+
+* *Model*: RAD attributes in `model_rad/`, hand-written resolvers in `model/`. Unchanged from standard RAD.
+* *Forms and reports*: `defsc-form` / `defsc-report` from `com.fulcrologic.rad.statechart.form` / `.report`.
+  Option keys (`fo/`, `ro/`) are the standard RAD ones.
+* *Routing*: every page is a state in `routing-chart` (`ui/routes.cljc`). Navigate with `scr/route-to!`,
+  `form/edit!`, `form/create!`. URLs come from `:route/segment` in the chart; `fo/route-prefix` and `ro/route`
+  are ignored.
+* *Unsaved changes*: leaving a dirty form puts the routing chart in `:routing-info/open`; `Root` shows a prompt
+  calling `scr/abandon-route-change!` or `scr/force-continue-routing!`.
+* *Rendering*: requiring `com.example.ui.render.plugin` registers `defmethod`s on RAD's rendering multimethods.
+
+=== Adding a design system (e.g. Tailwind + DaisyUI)
+
+1. Add your CSS build (e.g. the Tailwind CLI with DaisyUI) writing to `resources/public/css/main.css`,
+   and uncomment the stylesheet link in `components/ring_middleware.clj`.
+2. Add classes in `ui/render/*.cljc` (`input input-bordered`, `btn btn-primary`, `table`...). Write full,
+   literal class strings: Tailwind only finds classes it can see in the source. Point its `content` at `src/**/*.cljc`.
+3. Keep the `data-rad-*` attributes; the tests use them.
+
+== Authentication
+
+* *Users*: a `user` entity (`:user/id`, `:user/email`, `:user/password-hash`, `:user/active?`), separate from your
+  own entities. It is plain Datomic schema in `components/auth.clj`, deliberately *not* RAD attributes: RAD generates
+  resolvers for its attributes, which would let any client query the hashes. Passwords are bcrypt hashes
+  (`buddy-hashers`).
+* *Sessions*: the logged-in user id is stored in the encrypted session cookie (see Deployment, `SESSION_KEY`).
+  Login rotates the session id to prevent session fixation.
+* *Guard*: `auth/guard-plugin` (a Pathom plugin) refuses every resolver and mutation to anonymous requests except
+  `login`, `logout` and `:session/current-user`. Add role or ownership checks there.
+* *Client*: `com.example.session` asks the server who is logged in at startup. Routing only starts once someone is
+  logged in; in the browser, URL sync then restores the URL the user arrived on. Logout reloads the page.
+* *Not covered*: login rate limiting / lockout, sign-up, password reset, roles, and revoking sessions (a disabled
+  user can't log in again, but a session they already have stays valid until logout or `SESSION_KEY` rotation).
+
+=== Managing users
+
+Users are managed from a REPL, inside the running server, so nothing needs restarting:
+
+[source,clojure]
+----
+(require '[com.example.components.auth :as auth])
+(auth/add-user! "me@example.com" "a long password")
+(auth/set-password! "me@example.com" "another one")
+(auth/set-active! "me@example.com" false)   ; disable / re-enable login
+(auth/users)
+----
+
+In development that's your usual REPL. In production, see <<Operating the live server>>.
+
+=== Removing authentication
+
+Authentication is self-contained, for apps that don't need users. Sessions (and CSRF protection) and the live
+nREPL stay; they're general infrastructure.
+
+1. Delete `src/main/com/example/components/auth.clj`, `src/main/com/example/session.cljc`,
+   `src/main/com/example/ui/login.cljc` and `src/test/com/example/auth_test.clj`.
+2. `grep -rn "AUTH:" src deps.edn Makefile` and apply each marker: `AUTH: remove` at the end of a line removes
+   that line; `AUTH: remove the next N lines` and `AUTH: replace the next N lines with ...` say what they do.
+3. Remove this section and the `Auth` row from this guide.
+
+== Operating the live server
+
+Set `NREPL_PORT` and the server also starts an nREPL server, *bound to 127.0.0.1 only*. Use it to add users,
+inspect data or fix things without a restart. The uberjar contains a client:
+
+[source,bash]
+----
+# on the server (or `make repl-jar`, which uses $NREPL_PORT)
+java -cp app.jar clojure.main -m nrepl.cmdline --connect --host 127.0.0.1 --port 7888
+
+# Docker: the port is inside the container, so connect from inside it
+docker exec -it <container> java -cp app.jar clojure.main -m nrepl.cmdline --connect --host 127.0.0.1 --port 7888
+
+# From your machine with an editor (CIDER, Calva, Cursive...): tunnel it, then connect to localhost:7888
+ssh -N -L 7888:127.0.0.1:7888 you@server
+----
+
+An nREPL connection can run any code in the server and has no login of its own. Never publish the port or bind it
+to another interface; anyone with a shell on the machine (or `docker exec`) can use it. Leave `NREPL_PORT` unset
+to turn it off.
+
+== Backups
+
+With Datomic Local, back up from a REPL inside the running server (<<Operating the live server>>); no downtime:
+
+[source,clojure]
+----
+(require '[com.example.components.backup :as backup])
+(backup/backup!)            ; => {:path "/backups/backup-20261014T174403Z", :t 1234, :bytes ..., :attempts 1}
+(backup/backups)            ; newest first
+(backup/prune-backups! 14)  ; delete all but the 14 newest (only ever touches backups it created)
+----
+
+Backups go to `BACKUP_DIR` (`/backups` in the Docker image): an absolute path, ideally on different storage than
+the database. What `backup!` guarantees:
+
+* *Consistent while running*: a database is an append-only log plus an index. The index is copied first (copying
+  the log first can produce a corrupt backup), into a temp directory renamed only once complete.
+* *Verified*: the copy is opened and its newest transaction compared with the live database, both its data and its
+  log entry. A copy taken while a transaction was being written can hold the data but an empty log entry, a gap
+  that would stay permanent after a restore; such copies are retaken (`:attempts`), up to 5 times.
+* *Private*: files are readable only by the server's user. Backups contain everything, password hashes included.
+
+It does not copy backups off the machine. Do that separately (and encrypt them there), e.g. sync `BACKUP_DIR` to
+object storage on a schedule.
+
+*Scheduling*: run it from cron through the jar's nREPL client, e.g. nightly:
+
+[source,bash]
+----
+echo "(require 'com.example.components.backup) (com.example.components.backup/backup!) (com.example.components.backup/prune-backups! 14)" |
+  java -cp app.jar clojure.main -m nrepl.cmdline --connect --host 127.0.0.1 --port 7888
+----
+
+*Restoring* is purely a file operation; the app isn't involved, but it *must be stopped* (Datomic Local reads and
+appends to these files directly). A backup has the same layout as the storage directory (`app/example/db.log`...),
+so restoring means putting its contents there:
+
+[source,bash]
+----
+# with the server stopped
+mv "$DATOMIC_STORAGE_DIR" "$DATOMIC_STORAGE_DIR.before-restore"   # keep the current state, just in case
+mkdir "$DATOMIC_STORAGE_DIR"
+tar xzf backup-20261014T174403Z.tgz -C "$DATOMIC_STORAGE_DIR"      # an archived backup (tar czf X.tgz -C <backup-dir> .)
+# or, from a backup directory: cp -a /backups/backup-20261014T174403Z/. "$DATOMIC_STORAGE_DIR"/
+# then start the server
+----
+
+Don't start the server with `DATOMIC_STORAGE_DIR` pointing at a backup directory itself: it would write into it.
+
+With Docker, stop the app container and do the same from a throwaway container. The files must belong to the app's
+user (uid 10001), whatever machine the archive came from:
+
+[source,bash]
+----
+docker stop app
+docker run --rm -v app-data:/data -v "$PWD":/restore alpine sh -c '
+  mkdir -p /data/.before-restore && find /data -mindepth 1 -maxdepth 1 ! -name .before-restore -exec mv {} /data/.before-restore/ \; &&
+  tar xzf /restore/backup-20261014T174403Z.tgz -C /data && chown -R 10001 /data'
+docker start app
+----
+
+Once the restored app looks right, delete `/data/.before-restore` (or `$DATOMIC_STORAGE_DIR.before-restore`); a
+later restore needs it gone.
+
+With Datomic Pro or Cloud, use their own backup tools instead; `backup!` only handles Datomic Local.
+
+== Deployment
+
+The app is a single JVM process: http-kit serves the API and the compiled JS.
+
+[source,bash]
+----
+make uberjar          # shadow-cljs release + target/app.jar
+make run-jar          # runs it exactly like production: config/prod.edn + your environment
+make docker           # or build the image
+----
+
+==== Running the jar locally
+
+The jar always uses `config/prod.edn`, so set what it reads, e.g.:
+
+[source,bash]
+----
+export PORT=3000 DATOMIC_STORAGE_DIR="$PWD/data" SESSION_KEY=$(make -s session-key)
+export SECURE_COOKIES=false   # plain HTTP: without this the browser never sends the session cookie and login fails
+export NREPL_PORT=7888        # optional, for `make repl-jar`
+make run-jar
+----
+
+Keep `SESSION_KEY` stable between runs if you want to stay logged in.
+
+Runtime configuration (`config/prod.edn`, deep-merged over `config/defaults.edn`):
+
+[cols="1,3"]
+|===
+| `PORT` | HTTP port
+| `DATOMIC_STORAGE_DIR` | Absolute path for Datomic Local storage. *Must be persistent* (a volume); the Docker image uses `/data`.
+| `SESSION_KEY` | *Required.* 32 hex chars (`make session-key`) encrypting the session cookie. Nothing is stored server side, so sessions survive restarts and work across instances. Keep it stable and secret; changing it logs everybody out.
+| `NREPL_PORT` | Optional. Starts an nREPL server on 127.0.0.1 for <<Operating the live server>>.
+| `BACKUP_DIR` | Optional. Where `backup!` writes (see <<Backups>>); `/backups` in the Docker image.
+| `SECURE_COOKIES` | Unset = `true` (cookie sent over HTTPS only). Set `false` only to test over plain HTTP (see <<Running the jar locally>>).
+| `-Dconfig=/path.edn` | Replace `prod.edn` entirely, e.g. to point at Datomic Pro or Cloud instead of Datomic Local
+|===
+
+Every environment variable referenced in the config must be set, or the server refuses to start and lists all the
+missing ones (blank counts as missing). Variables that may be left unset are declared in `prod.edn` under
+`:com.example.components.config/optional-env`. Any startup failure exits with code 1.
+
+The schema is created/migrated automatically from your attributes at startup.
+
+=== Adding configuration
+
+To add settings for a new service (S3, Redis, an API key...):
+
+1. *Development values go in `config/defaults.edn`* (or `dev.edn`). Use local, non-secret values so the app and the
+   tests run without any environment setup. Tests load `dev.edn` too.
+2. *Production values go in `config/prod.edn`*, referencing environment variables for anything secret or
+   environment-specific: `:env/NAME` gives the string, `:env.edn/NAME` parses it as EDN (numbers, booleans).
+   `prod.edn` is deep-merged over `defaults.edn`, so only list what differs; set a key to `nil` to drop a dev-only
+   value.
+3. *Validation is automatic*: every variable referenced this way is required, and startup fails naming any that
+   are unset. If the service is optional, add its variables to `:com.example.components.config/optional-env`
+   (in `prod.edn`) and handle the `nil` in code.
+4. *Read it in the component* that uses it, with the key namespaced after that component, as in the example below.
+
+Example, an S3 client:
+
+[source,clojure]
+----
+;; config/defaults.edn: a local MinIO for development
+:com.example.components.s3/config {:bucket     "dev-bucket"
+                                   :region     "us-east-1"
+                                   :endpoint   "http://localhost:9000"
+                                   :access-key "minio"
+                                   :secret-key "minio123"}
+
+;; config/prod.edn: real credentials from the environment; no custom endpoint in prod
+:com.example.components.s3/config {:bucket     :env/S3_BUCKET
+                                   :region     :env/AWS_REGION
+                                   :endpoint   nil
+                                   :access-key :env/AWS_ACCESS_KEY_ID
+                                   :secret-key :env/AWS_SECRET_ACCESS_KEY}
+
+;; src/main/com/example/components/s3.clj
+(ns com.example.components.s3
+  (:require
+    [com.example.components.config :refer [config]]
+    [mount.core :refer [defstate]]))
+
+(defstate s3-client
+  :start (let [{:keys [bucket region endpoint access-key secret-key]} (::config config)]
+           (make-client ...)))   ; with your S3 library of choice
+----
+
+Starting production without, say, `AWS_REGION` then fails with
+`Missing required environment variables: AWS_REGION ...`. Never put a real secret as a literal in these files:
+they are committed and packaged into the jar.
+
+Things to decide before going to production:
+
+* *TLS*: terminate at a proxy/load balancer (HSTS is on, `:ssl-redirect` is off).
+* *Datomic topology*: Datomic Local is a single process writing to local disk, so run exactly one instance.
+  Scaling out means Datomic Pro (transactor + storage) or Datomic Cloud.
+* *Auth*: review <<Authentication>> for what's not covered (rate limiting, sign-up/reset, roles). Create the first
+  user over nREPL (see <<Operating the live server>>) before going live.
