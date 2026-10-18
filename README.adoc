@@ -10,7 +10,7 @@ Derived from https://github.com/fulcrologic/fulcro-rad-template[fulcro-rad-templ
 
 [source,bash]
 ----
-curl -fsSL https://raw.githubusercontent.com/GAUMALA/fulcro-rad-template/main/new-project.sh | sh
+curl -fsSL https://raw.githubusercontent.com/GAumala/fulcro-rad-template/main/new-project.sh | sh
 ----
 
 It asks for a project name (e.g. `my-app`) and a namespace prefix (e.g. `com.acme.my-app`), then creates
